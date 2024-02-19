@@ -6,3 +6,5 @@ There exists a pressing need for a single source of digestibility data. Therefor
 
 ## What is in this repository?
 Here you will find an excel file containing the most recent version of the data along with description of header names and associated docummentation as well as an R file which contains the code that runs the [live mock-up](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/) of the database.
+
+Please note that this project is actively under development and data is subject to change prior to a full release. 
