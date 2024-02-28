@@ -3,8 +3,9 @@ library(shiny)
 library(DT)
 library(readxl)
 library(fontawesome)
+library(readr)
 
-Protein_Digestibility_Data <- read_excel("Protein Digestibility Data .xlsx") %>%
+Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/NutrientInstitute/protein-digestibility/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv") %>%
     select(!Notes)
 
 
@@ -21,27 +22,35 @@ ui <- fluidPage(
             h3("Filters:"),
             column(2,
                    checkboxGroupInput("species",
-                                      "Subject species:",
-                                       choices = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))),
-                                      selected = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))))
+                                      "Species:",
+                                       # choices = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))),
+                                      choices = c("human", "pig", "rat"),
+                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Subject species`)))
+                                      selected = NULL)
             ),
             column(2,
                    checkboxGroupInput("protein_AA",
                                       "Protein or AA:",
-                                      choices = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))),
-                                      selected = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))))
+                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))),
+                                      choices = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"),
+                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))))
+                                      selected = NULL)
             ),
             column(2,
                    checkboxGroupInput("sample_type",
                                       "Sample type:",
-                                      choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
-                                      selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
+                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
+                                      choices = c("fecal", "ileal", "in vitro"),
+                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
+                                      selected = NULL)
             ),
             column(2,
                    checkboxGroupInput("calc",
                                       "Digestibility calculation:",
-                                      choices = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))),
-                                      selected = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))))
+                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))),
+                                      choices = c("apparent", "standardized", "true"),
+                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))))
+                                      selected = NULL)
             )
         ),
         # Create a new row for the table.
@@ -52,24 +61,34 @@ ui <- fluidPage(
 server <- function(input, output) {
     output$table <- DT::renderDataTable({
         DT::datatable(Protein_Digestibility_Data %>%
-            filter(`Subject species` %in% input$species) %>%
+            filter(`Species` %in% input$species) %>%
             filter(`Sample type` %in% input$sample_type) %>%
             filter(`Protein or AA` %in% input$protein_AA) %>%
             filter(`Digestibility calculation` %in% input$calc),
             extensions = 'Buttons',
+            class = "display cell-border compact",
             rownames = FALSE,
             options = list(
                 dom = 'Bfrtip',
                 # autoWidth = TRUE,
                 pageLength = 25,
                 lengthMenu = c(25, 50, 75, 100),
+                columnDefs = list(list(targets = "_all", className = "dt-head-nowrap")),
                 buttons =
                     list( list(
                         extend = 'collection',
                         buttons = c('csv', 'excel', 'pdf'),
                         text = 'Download'
                     )))
-    )})
+    )  %>%
+            formatStyle(1:14, 'vertical-align'='top', 'overflow-wrap'= 'break-word') %>%
+            # formatStyle(2, width = '8%') %>%
+            # formatStyle(4, width = '8%') %>%
+            # formatStyle(10, width = '5%') %>%
+            # formatStyle(12, width = '5%') %>%
+            formatStyle(13, 'overflow-wrap'= 'break-word', display = "block", overflow = 'hidden', width = '200px') %>%
+            formatStyle(14, width = '200px')
+    })
 }
 
 shinyApp(ui, server)
