@@ -12,7 +12,7 @@ Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/Nutrie
 # shiny app
 ui <- fluidPage(
     fluidPage(
-        fluidRow(h1("Protein Digestibility Data"),
+        fluidRow(h1("Protein Digestibility Hub"),
                  actionButton("gitbutton",
                               label = tags$h5("View data or docummentation on github  ", fa("github", fill = "black", height = "20px", vertical_align = "-0.35em"), onclick = "window.open('https://github.com/NutrientInstitute/protein-digestibility', '_blank')"),
                               style = "padding-top:0px;padding-bottom:0px;background-color:#F6F6F6;margin-bottom: 20px;float:right;")),
@@ -26,7 +26,8 @@ ui <- fluidPage(
                                        # choices = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))),
                                       choices = c("human", "pig", "rat"),
                                       # selected = c(unique(as.character(Protein_Digestibility_Data$`Subject species`)))
-                                      selected = NULL)
+                                      # selected = NULL
+                                      selected = c("human", "pig", "rat"))
             ),
             column(2,
                    checkboxGroupInput("protein_AA",
@@ -34,7 +35,8 @@ ui <- fluidPage(
                                       # choices = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))),
                                       choices = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"),
                                       # selected = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))))
-                                      selected = NULL)
+                                      # selected = NULL
+                                      selected = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"))
             ),
             column(2,
                    checkboxGroupInput("sample_type",
@@ -42,7 +44,8 @@ ui <- fluidPage(
                                       # choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
                                       choices = c("fecal", "ileal", "in vitro"),
                                       # selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
-                                      selected = NULL)
+                                      # selected = NULL
+                                      selected = c("fecal", "ileal", "in vitro"))
             ),
             column(2,
                    checkboxGroupInput("calc",
@@ -50,7 +53,8 @@ ui <- fluidPage(
                                       # choices = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))),
                                       choices = c("apparent", "standardized", "true"),
                                       # selected = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))))
-                                      selected = NULL)
+                                      # selected = NULL
+                                      selected = c("apparent", "standardized", "true"))
             )
         ),
         # Create a new row for the table.
@@ -59,7 +63,7 @@ ui <- fluidPage(
     )))
 
 server <- function(input, output) {
-    output$table <- DT::renderDataTable({
+    output$table <- DT::renderDataTable(server = FALSE, {
         DT::datatable(Protein_Digestibility_Data %>%
             filter(`Species` %in% input$species) %>%
             filter(`Sample type` %in% input$sample_type) %>%
