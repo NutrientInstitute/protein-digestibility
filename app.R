@@ -5,9 +5,9 @@ library(readxl)
 library(fontawesome)
 library(readr)
 
-Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/NutrientInstitute/protein-digestibility/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv") %>%
+Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/NutrientInstitute/protein-digestibility/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv", col_types = cols(`Digestibility calculation` = col_character())) %>%
     select(!Notes)
-
+fileName <- "Protein Digestibility Hub"
 
 # shiny app
 ui <- fluidPage(
@@ -78,13 +78,17 @@ server <- function(input, output) {
                 pageLength = 25,
                 lengthMenu = c(25, 50, 75, 100),
                 columnDefs = list(list(targets = "_all", className = "dt-head-nowrap")),
-                buttons =
-                    list( list(
+                buttons = list(
+                    'copy', 'print', list(
                         extend = 'collection',
-                        buttons = c('csv', 'excel', 'pdf'),
-                        text = 'Download'
-                    )))
-    )  %>%
+                        buttons = list(
+                            list(extend = "csv", filename = fileName),
+                            list(extend = "excel", filename = fileName),
+                            list(extend = "pdf", filename = fileName)),
+                        text = 'Download')
+                )
+            )
+        )  %>%
             formatStyle(1:14, 'vertical-align'='top', 'overflow-wrap'= 'break-word') %>%
             # formatStyle(2, width = '8%') %>%
             # formatStyle(4, width = '8%') %>%
