@@ -4,6 +4,6 @@ The Protein Digestibility Hub Project serves as a dedicated repository for prote
 
 
 ## What is in this repository?
-Here you will find an [excel file](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20%20-%20data%20and%20documentation.xlsx) containing the most recent version of the data along with description of header names and associated documentation as well as an R file which contains the code that runs the [live mock-up](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/) of the database, and the [CSV file](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv) the app pulls the data from.
+Here you will find an [excel file](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20-%20data%20and%20documentation.xlsx) containing the most recent version of the data along with description of header names and associated documentation as well as an R file which contains the code that runs the [live mock-up](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/) of the database, and the [CSV file](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv) the app pulls the data from.
 
 Please note that this project is actively under development and data is subject to change prior to a full release. 
