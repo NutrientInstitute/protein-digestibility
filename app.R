@@ -19,75 +19,86 @@ ui <- fluidPage(
 
         # Create a new Row in the UI for selectInputs
         fluidRow(style="background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px;",
-            h3("Filters:"),
-            column(2,
-                   checkboxGroupInput("species",
-                                      "Species:",
-                                       # choices = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))),
-                                      choices = c("human", "pig", "rat"),
-                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Subject species`)))
-                                      # selected = NULL
-                                      selected = c("human", "pig", "rat"))
-            ),
-            column(2,
-                   checkboxGroupInput("protein_AA",
-                                      "Protein or AA:",
-                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))),
-                                      choices = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"),
-                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))))
-                                      # selected = NULL
-                                      selected = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"))
-            ),
-            column(2,
-                   checkboxGroupInput("sample_type",
-                                      "Sample type:",
-                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
-                                      choices = c("fecal", "ileal", "in vitro"),
-                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
-                                      # selected = NULL
-                                      selected = c("fecal", "ileal", "in vitro"))
-            ),
-            column(2,
-                   checkboxGroupInput("calc",
-                                      "Digestibility calculation:",
-                                      # choices = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))),
-                                      choices = c("apparent", "standardized", "true"),
-                                      # selected = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))))
-                                      # selected = NULL
-                                      selected = c("apparent", "standardized", "true"))
-            )
+                 h3("Filters:"),
+                 column(2,
+                        checkboxGroupInput("species",
+                                           "Species:",
+                                           # choices = c(unique(as.character(Protein_Digestibility_Data$`Subject species`))),
+                                           choices = c("human", "pig", "rat"),
+                                           # selected = c(unique(as.character(Protein_Digestibility_Data$`Subject species`)))
+                                           # selected = NULL
+                                           selected = c("human", "pig", "rat"))
+                 ),
+                 column(2,
+                        checkboxGroupInput("model",
+                                           "Model:",
+                                           # choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
+                                           choices = c("in vivo", "in vitro"),
+                                           # selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
+                                           # selected = NULL
+                                           selected = c("in vivo", "in vitro"))
+                 ),
+                 column(2,
+                        checkboxGroupInput("sample",
+                                           "Sample:",
+                                           # choices = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))),
+                                           choices = c("fecal", "ileal"),
+                                           # selected = c(unique(as.character(Protein_Digestibility_Data$`Sample type`))))
+                                           # selected = NULL
+                                           selected = c("fecal", "ileal"))
+                 ),
+                 column(2,
+                        checkboxGroupInput("measure",
+                                           "Measure:",
+                                           # choices = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))),
+                                           choices = c("apparent digestibility", "standardized digestibility", "true digestibility", "biological value", "metabolic activity"),
+                                           # selected = c(unique(as.character(Protein_Digestibility_Data$`Digestibility calculation`))))
+                                           # selected = NULL
+                                           selected = c("apparent digestibility", "standardized digestibility", "true digestibility", "biological value", "metabolic activity"))
+                 ),
+
+                 column(2,
+                        checkboxGroupInput("analyte",
+                                           "Analyte:",
+                                           # choices = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))),
+                                           choices = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"),
+                                           # selected = c(unique(as.character(Protein_Digestibility_Data$`Protein or AA`))))
+                                           # selected = NULL
+                                           selected = c("crude protein", "histidine", "isoleucine", "leucine", "lysine", "reactive lysine", "methionine", "phenylalanine", "threonine", "tryptophan", "valine"))
+                 )
         ),
         # Create a new row for the table.
         fluidRow(style = "padding-top: 20px;",
-            DT::dataTableOutput("table")
-    )))
+                 DT::dataTableOutput("table")
+        )))
 
 server <- function(input, output) {
     output$table <- DT::renderDataTable(server = FALSE, {
         DT::datatable(Protein_Digestibility_Data %>%
-            filter(`Species` %in% input$species) %>%
-            filter(`Sample type` %in% input$sample_type) %>%
-            filter(`Protein or AA` %in% input$protein_AA) %>%
-            filter(`Digestibility calculation` %in% input$calc),
-            extensions = 'Buttons',
-            class = "display cell-border compact",
-            rownames = FALSE,
-            options = list(
-                dom = 'Bfrtip',
-                # autoWidth = TRUE,
-                pageLength = 25,
-                lengthMenu = c(25, 50, 75, 100),
-                columnDefs = list(list(targets = "_all", className = "dt-head-nowrap")),
-                buttons = list(
-                    'copy', 'print', list(
-                        extend = 'collection',
-                        buttons = list(
-                            list(extend = "csv", filename = fileName),
-                            list(extend = "excel", filename = fileName),
-                            list(extend = "pdf", filename = fileName)),
-                        text = 'Download')
-                )
-            )
+                          filter(`Species` %in% input$species) %>%
+                          filter(`Model` %in% input$model) %>%
+                          filter(`Sample` %in% input$sample) %>%
+                          filter(`Analyte` %in% input$analyte) %>%
+                          filter(`Measure` %in% input$measure),
+                      extensions = 'Buttons',
+                      class = "display cell-border compact",
+                      rownames = FALSE,
+                      options = list(
+                          dom = 'Bfrtip',
+                          # autoWidth = TRUE,
+                          pageLength = 25,
+                          lengthMenu = c(25, 50, 75, 100),
+                          columnDefs = list(list(targets = "_all", className = "dt-head-nowrap")),
+                          buttons = list(
+                              'copy', 'print', list(
+                                  extend = 'collection',
+                                  buttons = list(
+                                      list(extend = "csv", filename = fileName),
+                                      list(extend = "excel", filename = fileName),
+                                      list(extend = "pdf", filename = fileName)),
+                                  text = 'Download')
+                          )
+                      )
         )  %>%
             formatStyle(1:14, 'vertical-align'='top', 'overflow-wrap'= 'break-word') %>%
             # formatStyle(2, width = '8%') %>%
