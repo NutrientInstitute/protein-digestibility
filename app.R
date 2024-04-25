@@ -68,7 +68,7 @@ ui <- fluidPage(
                     p("Currently, the Protein Digestibility Hub contains data from the following sources:"),
                     tags$ul(
                         tags$li(a(href = "https://www.ars.usda.gov/arsuserfiles/80400535/data/classics/usda%20handbook%2074.pdf", "USDA ENERGY VALUE OF FOODS (Agricultural Handbook No. 74, 1955)")),
-                        tags$li(a(href = "https://www.fao.org/3/AC854T/AC854T00.htm#TOC", "AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970)")),
+                        tags$li( "AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970)"),
                         tags$li(a(href = "https://www.fao.org/ag/humannutrition/36216-04a2f02ec02eafd4f457dd2c9851b4c45.pdf", "Report of a Sub-Committee of the 2011 FAO Consultation on 'Protein Quality Evaluation in Human Nutrition'"))
                     )))
         ),
