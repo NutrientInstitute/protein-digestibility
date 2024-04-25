@@ -10,7 +10,7 @@ Here you will find an [excel file](https://github.com/NutrientInstitute/protein-
 
 The current version of the Protein Digestibility Hub, contains data collected from the following sources:
 - [USDA ENERGY VALUE OF FOODS (Agricultural Handbook No. 74, 1955)](https://www.ars.usda.gov/arsuserfiles/80400535/data/classics/usda%20handbook%2074.pdf)
-- [AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970)](https://www.fao.org/3/AC854T/AC854T00.htm#TOC)
+- AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970) (<b>Note:</b> Original publicatoin has been removed from FAO website, but can still be accessed via the [Wayback Machine](https://web.archive.org/web/20231125115519/https://www.fao.org/3/ac854t/AC854T00.htm))
 - [Report of a Sub-Committee of the 2011 FAO Consultation on 'Protein Quality Evaluation in Human Nutrition'](https://www.fao.org/ag/humannutrition/36216-04a2f02ec02eafd4f457dd2c9851b4c45.pdf)
 
 
