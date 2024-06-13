@@ -11,12 +11,14 @@ Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/Nutrie
 # Protein_Digestibility_Data <-
 #     read_csv("Protein Digestibility Data  - full data.csv") %>%
     select(!Notes)
-EAA_composition <- read_csv("EAA_composition.csv")
+EAA_composition <- read_csv("EAA_composition.csv") %>%
+    drop_na(Protein) %>%
+    pivot_longer(histidine:valine, names_to = "AA", values_to = "value")
 scoring_pattern <- read_csv("scoring_pattern.csv")
 portion_sizes <- read_csv("portion_sizes.csv")
 
 
-fileName <- "Protein Digestibility Hub"
+fileName <- "Protein & Amino Acid Hub"
 
 # shiny app
 ui <- fluidPage(
@@ -83,7 +85,7 @@ ui <- fluidPage(
         fluidRow(br()),
         withMathJax(),
         fluidRow(
-            column(5, h1("Protein Digestibility Hub")),
+            column(5, h1("Protein & Amino Acid Hub")),
             actionButton(
                 "gitbutton",
                 label = tags$h5(
@@ -413,50 +415,74 @@ ui <- fluidPage(
                             "to report problems or provide feedback."
                         ),
                         br(),
+
+                        h4("EAA-9:", tags$sup("1")),
                         p(
-                            "Protein quality scores are calculated from the following formulas:"
+                            "Intended application: EAA-9 scores are percentages, representing the ability of a food to meet daily essential amino acid (EAA) recommendations, by default the RDAs. In practice, the score can be used to compare protein quality between food sources, and as a dietary quality tool to track progress toward meeting EAA recommendations."
                         ),
-                        tags$ul(
-                            tags$li(
-                                '\\(\\text{EAA-9}=min(\\frac{\\text{His Present}}{\\text{His RDA}},\\frac{\\text{Ile Present}}{\\text{Ile RDA}},\\frac{\\text{Leu Present}}{\\text{Leu RDA}},\\frac{\\text{Lys Present}}{\\text{Lys RDA}},\\frac{\\text{Met Present}}{\\text{Met RDA}},\\frac{\\text{Phe Present}}{\\text{Phe RDA}},\\frac{\\text{Thr Present}}{\\text{Thr RDA}},\\frac{\\text{Trp Present}}{\\text{Trp RDA}},\\frac{\\text{Val Present}}{\\text{Val RDA}})\\times100\\times\\text{digestibility}\\)',
-                                p(
-                                    " Calculation is based on the minimum percentage of the RDA met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid.",
-                                    tags$sup("1"),
-                                    br()
-                                )
-                            ),
-                            tags$li(
-                                '\\(\\text{PDCAAS}=min(\\frac{\\text{mg of amino acid in 1 g test protein}}{\\text{mg of amino acid in reference pattern}},1)\\times\\text{digestibility}\\)',
-                                p(
-                                    "FAO/WHO/UNU amino acid score calculated using limiting amino acid and truncated at 100%; equations are further defined in the 2007 FAO/WHO/UNU report.",
-                                    tags$sup("2"),
-                                    br()
-                                )
-                            ),
-                            tags$li(
-                                '\\(\\text{DIAAS}=100\\times\\frac{\\text{mg of digestible dietary indispensable amino acid in 1 g of the dietary protein}}{\\text{mg of the same dietary indispensable amino acid in 1g of the reference protein}}\\)',
-                                p(
-                                    "Values above 100% should not be truncated as was done for the PDCAAS value, except where calculating DIAAS for protein or amino acid intakes for mixed diets or sole source foods where truncated values must be used.",
-                                    tags$sup("3"),
-                                    br()
-                                )
-                            ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        # " Calculation is based on the minimum percentage of the RDA met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid.",
+                        p(
+                            "The EAA-9 calculation is based on the minimum percentage of the RDA (or personalized EAA recommendations) met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid adjusted for digestibility (if digestibility data is available). EAA RDAs are satisfied when the EAA-9 score for foods consumed in a day reaches 100%."
                         ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        '\\(\\text{EAA-9}=min(\\frac{\\text{His Present}}{\\text{His RDA}},\\frac{\\text{Ile Present}}{\\text{Ile RDA}},\\frac{\\text{Leu Present}}{\\text{Leu RDA}},\\frac{\\text{Lys Present}}{\\text{Lys RDA}},\\frac{\\text{Met Present}}{\\text{Met RDA}},\\frac{\\text{Phe Present}}{\\text{Phe RDA}},\\frac{\\text{Thr Present}}{\\text{Thr RDA}},\\frac{\\text{Trp Present}}{\\text{Trp RDA}},\\frac{\\text{Val Present}}{\\text{Val RDA}})\\times100\\times\\text{digestibility}\\)',
                         br(),
-                        tags$small(p("References:"),
+                        p(br()),
+                        h4(
+                            "Protein Digestibility Corrected Amino Acid Score (PDCAAS):",
+                            tags$sup("2")
+                        ),
+                        p(
+                            "Intended application: PDCAAS values range from 0 to 1 and represent the quality of 1 gram of protein from a food source compared to a reference gram of protein. In practice, the score can be used to compare the protein quality between food sources on a per gram basis."
+                        ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        p(
+                            "The PDCAAS calculation is based on the ratio of limiting amino acid in a gram of protein compared to the same amino acid in a reference protein capped at 1 (i.e. 100%), adjusted for digestibility. PDCASS was designed to be calculated using fecal digestibility values.*"
+                        ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        '\\(\\text{PDCAAS}=min(\\frac{\\text{mg of amino acid in 1 g test protein}}{\\text{mg of amino acid in reference pattern}},1)\\times\\text{digestibility}\\)',
+                        br(),
+                        p(br()),
+                        h4(
+                            "Digestible Indispensable Amino Acid Score (DIAAS):",
+                            tags$sup("3")
+                        ),
+                        p(
+                            "Intended application: DIAAS values represent the ratio between the quality of 1 gram of protein from a food source compared to a reference gram of protein. In practice, the score can be used to compare the protein quality between food sources on a per gram basis."
+                        ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        p(
+                            "The DIAAS calculation is based on the ratio of limiting amino acid in a gram of protein compared to the same amino acid in a reference protein, adjusted for digestibility. Unlike PDCAAS, DIAAS is not truncated at 1 (i.e. 100%) and is  calculated using ileal digestibility.*"
+                        ),
+                        p(br(), style = "margin-bottom: -15px;"),
+                        '\\(\\text{DIAAS}=100\\times\\frac{\\text{mg of digestible dietary indispensable amino acid in 1 g of the dietary protein}}{\\text{mg of the same dietary indispensable amino acid in 1g of the reference protein}}\\times\\text{digestibility}\\)',
+                        p(br()),
+                        p(
+                            "*While specific digestibility samples (i.e. ileal, fecal) are preferred in the calculation of PDCAAS and DIAAS, protein quality scores are provided for all available digestibility values."
+                        ),
+
+                        br(),
+                        tags$small(h5("References:"),
                                    tags$ol(tags$li(
                                        p(
-                                           "Forester SM, Jennings-Dobbs EM, Sathar SA, Layman DK. Perspective: Developing a Nutrient-Based Framework for Protein Quality. J Nutr. 2023 Aug;153(8):2137-2146. doi: 10.1016/j.tjnut.2023.06.004. Epub 2023 Jun 8. PMID: 37301285."
+                                           "Forester SM, Jennings-Dobbs EM, Sathar SA, Layman DK. Perspective: Developing a Nutrient-Based Framework for Protein Quality. J Nutr. 2023 Aug;153(8):2137-2146. doi: ",
+                                           a(href = "10.1016/j.tjnut.2023.06.004", "https://doi.org/10.1016/j.tjnut.2023.06.004"),
+                                           ". Epub 2023 Jun 8. PMID: 37301285."
                                        )
                                    ),
                                    tags$li(
                                        p(
-                                           "Food and Agriculture Organization of the United Nations, World Health Organization & United Nations University. Protein and amino acid requirements in human nutrition : report of a joint FAO/WHO/UNU expert consultation [Internet]. World Health Organization; 2007 [cited 2022 Dec 1]. Available from: https://apps.who.int/iris/handle/10665/43411."
+                                           "Food and Agriculture Organization of the United Nations, World Health Organization & United Nations University. Protein and amino acid requirements in human nutrition : report of a joint FAO/WHO/UNU expert consultation [Internet]. World Health Organization; 2007 [cited 2022 Dec 1]. Available from: ",
+                                           a(href = "https://apps.who.int/iris/handle/10665/43411", "https://apps.who.int/iris/handle/10665/43411"),
+                                           "."
                                        )
                                    ),
                                    tags$li(
                                        p(
-                                           "FAO. Dietary protein quality evaluation in human nutrition: report of an FAO Expert Consultation. Food and nutrition paper; 92. FAO: Rome [Internet]. FAO (Food and Agriculture Organization); 2013. Available from: https://www.fao.org/ag/humannutrition/35978-02317b979a686a57aa4593304ffc17f06.pdf."
+                                           "FAO. Dietary protein quality evaluation in human nutrition: report of an FAO Expert Consultation. Food and nutrition paper; 92. FAO: Rome [Internet]. FAO (Food and Agriculture Organization); 2013. Available from:",
+                                           a(href = "https://www.fao.org/ag/humannutrition/35978-02317b979a686a57aa4593304ffc17f06.pdf", "https://www.fao.org/ag/humannutrition/35978-02317b979a686a57aa4593304ffc17f06.pdf"),
+                                           "."
                                        )
                                    )))
                     )
@@ -681,6 +707,79 @@ ui <- fluidPage(
                 # Create a new row for the table.
                 fluidRow(style = "padding-top: 20px;",
                          DT::dataTableOutput("table_2"))
+            ),
+            nav_panel(
+                "AA Composition Data",
+                fluidRow(
+                    div(
+                        id = "info-toggle_3",
+                        class = "accordion-toggle",
+                        onclick = "if (event.target === this || event.target.tagName === 'P' || event.target.className.includes('column')) { Shiny.setInputValue('info_toggle_3_click', Math.random(), {priority: 'event'}); }",
+                        column(
+                            8,
+                            p("Information", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
+                        ),
+                        column(4, uiOutput("toggleButton_3"))
+                    )
+                ),
+                fluidRow(hidden(
+                    div(
+                        id = "infoContent_3",
+                        class = "accordion-content",
+                        style = "background-color: #F6F6F6;padding-left: 30px;padding-right: 20px; padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
+                        p("Here you will find the food composition data used to calculate protein quality scores. References to food composition data sources can be found below."),
+                        br(),
+                        p("References:"),
+                        tags$ol(
+                            tags$li("Haytowitz DB, Ahuja JKC, Wu X, Somanchi M, Nickle M, Nguyen QA, et al. USDA National Nutrient Database for Standard Reference, Legacy Release. In: FoodData Central.  Nutrient Data Laboratory, Beltsville Human Nutrition Research Center, ARS, USDA; 2019.  https://doi.org/10.15482/USDA.ADC/1529216. Accessed May 27, 2022.")
+                        ),
+                        br()
+                    )
+                )),
+                fluidRow(br()),
+                fluidRow(
+                    div(style = "font-size: 1.2em;",
+                        prettyToggle(
+                            inputId = "show_NI_ID",
+                            label_on = "Hide NI_ID",
+                            icon_on = icon("square-minus"),
+                            status_on = "default",
+                            status_off = "default",
+                            label_off = "Show NI_ID",
+                            icon_off = icon("square-plus"),
+                            bigger = TRUE,
+                            shape = "curve"
+                        )
+                    )
+                ),
+                # Create a new Row in the UI for selectInputs
+                # fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px solid #bdbdbd;font-weight: bold;",
+                #          column(
+                #              4,
+                #              p("Search", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
+                #          )),
+                # fluidRow(
+                #     style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
+                #     column(
+                #         2,
+                #         textInput(inputId = "foodcomp_NI_ID",
+                #                   label = "NI_ID")
+                #     ),
+                #     column(
+                #         2,
+                #         textInput(inputId = "foodcomp_food",
+                #                   label = "Food")
+                #         ),
+                #     column(
+                #         2,
+                #         textInput(inputId = "foodcomp_FDC_ID",
+                #                   label = "FDC_ID")
+                #     )
+                #     ),
+                # fluidRow(br()),
+                # Create a new row for the table.
+                fluidRow(style = "padding-top: 20px;",
+                         DT::dataTableOutput("table_3"))
             )
         )
     )
@@ -721,6 +820,22 @@ server <- function(input, output, session) {
         }
     })
 
+    output$toggleButton_3 <- renderUI({
+        if (visibility()) {
+            actionButton(
+                "show_hide_3",
+                label = icon("plus", style = "color: #333; font-size: 24px; font-weight: bold;"),
+                class = "float-right-button"
+            )
+        } else {
+            actionButton(
+                "show_hide_3",
+                label = icon("minus", style = "color: #333; font-size: 24px; font-weight: bold;"),
+                class = "float-right-button"
+            )
+        }
+    })
+
     observeEvent(input$show_hide, {
         visibility(!visibility())
         shinyjs::toggle(id = "infoContent", anim = TRUE)
@@ -729,6 +844,11 @@ server <- function(input, output, session) {
     observeEvent(input$show_hide_2, {
         visibility(!visibility())
         shinyjs::toggle(id = "infoContent_2", anim = TRUE)
+    })
+
+    observeEvent(input$show_hide_3, {
+        visibility(!visibility())
+        shinyjs::toggle(id = "infoContent_3", anim = TRUE)
     })
 
 
@@ -741,6 +861,11 @@ server <- function(input, output, session) {
     observeEvent(input$info_toggle_2_click, {
         visibility(!visibility())
         shinyjs::toggle(id = "infoContent_2", anim = TRUE)
+    }, ignoreInit = TRUE)  # ignore initialization phase
+
+    observeEvent(input$info_toggle_3_click, {
+        visibility(!visibility())
+        shinyjs::toggle(id = "infoContent_3", anim = TRUE)
     }, ignoreInit = TRUE)  # ignore initialization phase
 
 
@@ -780,7 +905,7 @@ server <- function(input, output, session) {
 
 
 
-    # table for protein digestibility data
+    # render table for protein digestibility data
     output$table <- DT::renderDataTable(server = TRUE, {
         DT::datatable(
             Protein_Digestibility_Data %>%
@@ -804,6 +929,9 @@ server <- function(input, output, session) {
                 filter(`Sample` %in% input$sample) %>%
                 filter(`Analyte` %in% input$analyte) %>%
                 filter(`Measure` %in% input$measure) %>%
+                filter(str_detect(
+                    NI_ID, ifelse(input$NI_ID_tab1 == "", ".*", paste0("(?i)", input$NI_ID_tab1))
+                )) %>%
                 filter(str_detect(
                     `Food group`,
                     ifelse(
@@ -844,10 +972,11 @@ server <- function(input, output, session) {
                 mutate(across(
                     where(is.character), ~ gsub("\n", "<br>", .)
                 )),
-            extensions = 'Buttons',
+            extensions = c('Buttons', 'FixedHeader'),
             class = "display cell-border compact",
             rownames = FALSE,
             options = list(
+                fixedHeader = TRUE,
                 dom = 'Brtip',
                 pageLength = 25,
                 lengthMenu = c(25, 50, 75, 100),
@@ -874,14 +1003,15 @@ server <- function(input, output, session) {
                         'vertical-align' = 'top',
                         'overflow-wrap' = 'break-word') %>%
             formatStyle(
-                14,
+                14:15,
                 'overflow-wrap' = 'break-word',
                 'word-break' = 'break-word',
                 width = '10%'
             ) %>%
             formatStyle(15, width = '10%')
     })
-    # table for protein quality scores
+
+    # render table for protein quality scores
     output$table_2 <- DT::renderDataTable(server = TRUE, {
         PQ_df <- data.frame(NI_ID = character())
 
@@ -910,17 +1040,6 @@ server <- function(input, output, session) {
                             ) %>%
                             mutate(value = value * 1000) %>%
                             mutate(value = value * (g_weight / 100)) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -949,8 +1068,7 @@ server <- function(input, output, session) {
                             separate_longer_delim(NI_ID, delim = ";") %>%
                             left_join(Protein_Digestibility_Data) %>%
                             mutate(value_label = `Value (%)`) %>%
-                            mutate(`Value (%)` = as.numeric(`Value (%)`) /
-                                       100) %>%
+                            mutate(`Value (%)` = as.numeric(`Value (%)`) / 100) %>%
                             mutate(`EAA-9` = `EAA-9` * `Value (%)`) %>%
                             filter(
                                 Analyte == "crude protein" |
@@ -996,16 +1114,6 @@ server <- function(input, output, session) {
                                                         100)) %>%
                             mutate(portion = paste0(input$serving_weight, " g")) %>%
                             mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(scoring_pattern_alt) %>%
                             mutate(value = value / (Amount * input$weight)) %>%
                             select(fdcId,
@@ -1076,40 +1184,20 @@ server <- function(input, output, session) {
                                 portion_sizes %>%
                                     select(fdc_id, g_weight , portion) %>%
                                     rename("fdcId" = "fdc_id") %>%
-                                    mutate(
-                                        portion = paste0(portion, " (", g_weight, " g)")
-                                    )
-                            ) %>%
+                                    mutate(portion = paste0(portion, " (", g_weight, " g)"))
+                                ) %>%
                             mutate(value = value * 1000) %>%
                             mutate(value = value * (g_weight / 100)) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
                                     filter(`Pattern Name` == input$EAA_rec) %>%
                                     filter(ifelse(is.character(input$rec_age), Age == input$rec_age, !is.na(Age))) %>%
                                     select(AA, Amount)
-                            ) %>%
-                            mutate(calculation = paste0(value, "/", Amount *
-                                                            input$weight)) %>%
+                                ) %>%
+                            mutate(calculation = paste0(value, "/", Amount * input$weight)) %>%
                             mutate(value = value / (Amount * input$weight)) %>%
-                            select(fdcId,
-                                   NI_ID,
-                                   Protein,
-                                   portion,
-                                   value,
-                                   AA,
-                                   calculation)
+                            select(fdcId, NI_ID, Protein, portion, value, AA, calculation)
 
                         temp <- EAA_9 %>%
                             select(fdcId, NI_ID, value, calculation) %>%
@@ -1201,17 +1289,6 @@ server <- function(input, output, session) {
                             mutate(value = value * (input$serving_weight /
                                                         100)) %>%
                             mutate(portion = paste0(input$serving_weight, " g")) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -1238,9 +1315,7 @@ server <- function(input, output, session) {
                                     "min(",
                                     str_c(calculation, collapse = ", "),
                                     ") x 100 x digestibility = ",
-                                    paste0(min(round(
-                                        value, 2
-                                    ))),
+                                    paste0(min(round(value, 2))),
                                     " x 100 x digestibility"
                                 )
                             ) %>%
@@ -1326,17 +1401,6 @@ server <- function(input, output, session) {
                             ) %>%
                             mutate(value = value * 1000) %>%
                             mutate(value = value * (g_weight / 100)) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -1410,17 +1474,6 @@ server <- function(input, output, session) {
                             mutate(value = value * (input$serving_weight /
                                                         100)) %>%
                             mutate(portion = paste0(input$serving_weight, " g")) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -1503,17 +1556,6 @@ server <- function(input, output, session) {
                             ) %>%
                             mutate(value = value * 1000) %>%
                             mutate(value = value * (g_weight / 100)) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -1622,17 +1664,6 @@ server <- function(input, output, session) {
                             mutate(value = value * (input$serving_weight /
                                                         100)) %>%
                             mutate(portion = paste0(input$serving_weight, " g")) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "methionine",
-                                "methionine+cysteine"
-                            )) %>%
-                            mutate(AA = str_replace(
-                                AA,
-                                "phenylalanine",
-                                "phenylalanine+tyrosine"
-                            )) %>%
                             left_join(
                                 scoring_pattern %>%
                                     rename("AA" = "Analyte") %>%
@@ -1742,17 +1773,10 @@ server <- function(input, output, session) {
 
         }
 
-        if ("PDCAAS" %in% input$score) {
+        if (ifelse(length(input$score != 1), "PDCAAS" %in% input$score,  "PDCAAS" == input$score)) {
             if (input$show_calc == "score_only") {
                 PDCAAS <- EAA_composition %>%
                     mutate(value = (value * 1000) / Protein) %>%
-                    mutate(AA = tolower(AA)) %>%
-                    mutate(AA = str_replace(AA, "methionine", "methionine+cysteine")) %>%
-                    mutate(AA = str_replace(
-                        AA,
-                        "phenylalanine",
-                        "phenylalanine+tyrosine"
-                    )) %>%
                     left_join(
                         scoring_pattern %>%
                             rename("AA" = "Analyte") %>%
@@ -1813,13 +1837,6 @@ server <- function(input, output, session) {
                 PDCAAS <- EAA_composition %>%
                     mutate(value = (value) / Protein) %>%
                     mutate(value = value * 1000) %>%
-                    mutate(AA = tolower(AA)) %>%
-                    mutate(AA = str_replace(AA, "methionine", "methionine+cysteine")) %>%
-                    mutate(AA = str_replace(
-                        AA,
-                        "phenylalanine",
-                        "phenylalanine+tyrosine"
-                    )) %>%
                     left_join(
                         scoring_pattern %>%
                             rename("AA" = "Analyte") %>%
@@ -1914,13 +1931,6 @@ server <- function(input, output, session) {
             if (input$show_calc == "score_only") {
                 DIAAS <- EAA_composition %>%
                     mutate(value = (value * 1000) / Protein) %>%
-                    mutate(AA = tolower(AA)) %>%
-                    mutate(AA = str_replace(AA, "methionine", "methionine+cysteine")) %>%
-                    mutate(AA = str_replace(
-                        AA,
-                        "phenylalanine",
-                        "phenylalanine+tyrosine"
-                    )) %>%
                     left_join(
                         scoring_pattern %>%
                             rename("AA" = "Analyte") %>%
@@ -1978,13 +1988,6 @@ server <- function(input, output, session) {
             if (input$show_calc == "show_calc") {
                 DIAAS <- EAA_composition %>%
                     mutate(value = (value * 1000) / Protein) %>%
-                    mutate(AA = tolower(AA)) %>%
-                    mutate(AA = str_replace(AA, "methionine", "methionine+cysteine")) %>%
-                    mutate(AA = str_replace(
-                        AA,
-                        "phenylalanine",
-                        "phenylalanine+tyrosine"
-                    )) %>%
                     left_join(
                         scoring_pattern %>%
                             rename("AA" = "Analyte") %>%
@@ -2021,7 +2024,6 @@ server <- function(input, output, session) {
                     mutate(DIAAS = min(value)) %>%
                     filter(value == DIAAS) %>%
                     ungroup() %>%
-                    mutate(DIAAS = DIAAS, 1) %>%
                     select(fdcId, NI_ID, Protein, AA, DIAAS, calculation) %>%
                     rename("Limiting AA" = "AA") %>%
                     separate_longer_delim(NI_ID, delim = ";") %>%
@@ -2095,19 +2097,21 @@ server <- function(input, output, session) {
                         fdcId
                     )
                 ) %>%
+                arrange(NI_ID) %>%
                 rename("Food Composition Data Citation" = "fdcId") %>%
                 filter(`Digestibility Sample` %in% input$pq_sample) %>%
                 filter(`Digestibility Measure` %in% input$pq_measure) %>%
                 filter(`Digestibility Species` %in% input$pq_species),
-            extensions = 'Buttons',
             class = "display cell-border compact",
             rownames = FALSE,
+            extensions = c('FixedHeader', 'Buttons'),
             options = list(
+                fixedHeader = TRUE,
                 dom = 'Brftip',
                 pageLength = 25,
-                lengthMenu = c(25, 50, 75, 100),
+                lengthMenu = c(15, 25, 50, 75, 100),
                 columnDefs = list(list(
-                    targets = c(1, 2, 10), className = "dt-head-nowrap"
+                    targets = c(1, 2, 9), className = "dt-head-nowrap"
                 )),
                 buttons = list(
                     'copy',
@@ -2130,6 +2134,74 @@ server <- function(input, output, session) {
                         'overflow-wrap' = 'break-word') %>%
             formatStyle(3:7, width = '6%') %>%
             formatStyle(9, width = '8%')
+    })
+
+    # table for food mappings
+    output$table_3 <- DT::renderDataTable(server = TRUE, {
+        fdcmp_df <- EAA_composition
+
+        if(input$show_NI_ID == FALSE){
+            fdcmp_df <- fdcmp_df %>%
+                select(fdcId, description, Protein, AA, value) %>%
+                mutate("FDC_ID" = fdcId) %>%
+                select(FDC_ID, description, Protein, AA, value) %>%
+                distinct() %>%
+                mutate(AA = factor(AA,
+                                   levels = c("Histidine", "Isoleucine", "Leucine", "Lysine", "Methionine", "Phenylalanine", "Threonine", "Tryptophan", "Valine"),
+                                   labels = c("His (g/100g)", "Ile (g/100g)", "Leu (g/100g)", "Lys (g/100g)", "Met+Cys (g/100g)", "Phe+Tyr (g/100g)", "Thr (g/100g)", "Trp (g/100g)", "Val (g/100g)"))) %>%
+                pivot_wider(names_from = "AA", values_from = "value") %>%
+                rename("Protein (g/100g)" = "Protein") %>%
+                rename("Food description" = "description") %>%
+                mutate("Ref No" = 1) %>%
+                distinct()
+        }else{
+            fdcmp_df <- EAA_composition %>%
+                select(NI_ID, description, fdcId, Protein, AA, value) %>%
+                mutate("FDC_ID" = fdcId) %>%
+                mutate(NI_ID = str_replace_all(NI_ID, ";", "; ")) %>%
+                select(NI_ID, FDC_ID, description, Protein, AA, value) %>%
+                distinct() %>%
+                mutate(AA = factor(AA,
+                                   levels = c("Histidine", "Isoleucine", "Leucine", "Lysine", "Methionine", "Phenylalanine", "Threonine", "Tryptophan", "Valine"),
+                                   labels = c("His (g/100g)", "Ile (g/100g)", "Leu (g/100g)", "Lys (g/100g)", "Met+Cys (g/100g)", "Phe+Tyr (g/100g)", "Thr (g/100g)", "Trp (g/100g)", "Val (g/100g)"))) %>%
+                pivot_wider(names_from = "AA", values_from = "value") %>%
+                rename("Protein (g/100g)" = "Protein") %>%
+                rename("Food description" = "description") %>%
+                mutate("Ref No" = 1) %>%
+                distinct()
+        }
+
+        DT::datatable(
+            fdcmp_df,
+            extensions = c('Buttons', 'FixedHeader'),
+            class = "display cell-border compact",
+            rownames = FALSE,
+            options = list(
+                fixedHeader = TRUE,
+                scrollCollapse = TRUE,
+                dom = 'Brftip',
+                pageLength = 25,
+                lengthMenu = c(15, 25, 50, 75, 100),
+                buttons = list(
+                    'copy',
+                    'print',
+                    list(
+                        extend = 'collection',
+                        buttons = list(
+                            list(extend = "csv", filename = fileName),
+                            list(extend = "excel", filename = fileName),
+                            list(extend = "pdf", filename = fileName)
+                        ),
+                        text = 'Download'
+                    )
+                )
+            ),
+            escape = FALSE  # Allow HTML rendering
+        ) %>%
+            formatStyle(1:16,
+                        'vertical-align' = 'top',
+                        'overflow-wrap' = 'break-word') %>%
+            formatStyle(4:14, width = '5%')
     })
 }
 
