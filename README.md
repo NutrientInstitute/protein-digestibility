@@ -6,13 +6,13 @@ To provide feedback on this app or sign up to be notified about future releases,
 
 
 ## What is in this repository?
-This repository contains the resources used to run the [Protein Digestibility Hub app](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/). Below you will find a brief description of the two tabs within the app: <i>Protein Digestibility Data</i> and <i>Protein Quality Scoring</i>. Both tabs are run from code in the [app.R](https://github.com/NutrientInstitute/protein-digestibility/blob/main/app.R) file.
+This repository contains the resources used to run the [Protein & Amino Acid Hub app](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/). Below you will find a brief description of the two tabs within the app: <i>Protein Digestibility Data</i> and <i>Protein Quality Scoring</i>. Both tabs are run from code in the [app.R](https://github.com/NutrientInstitute/protein-digestibility/blob/main/app.R) file.
 
 
 ### Protein Digestibility Data
 Data displayed in the <i>Protein Digestibility Data</i> table are provided in [Protein Digestibility Data  - full data.csv](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv). Additionally, data and documentation of column definitions are provided as a Microsoft Excel file ([Protein Digestibility Data - data and documentation.xlsx](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Protein%20Digestibility%20Data%20-%20data%20and%20documentation.xlsx)).
 
-The current version of the Protein Digestibility Hub, contains data collected from the following sources:
+The current version of the Protein & Amino Acid Hub, contains data collected from the following sources:
 - [USDA ENERGY VALUE OF FOODS (Agricultural Handbook No. 74, 1955)](https://www.ars.usda.gov/arsuserfiles/80400535/data/classics/usda%20handbook%2074.pdf)
 - AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970) (<b>Note:</b> Original publication has been removed from FAO website, but can still be accessed via the [Wayback Machine](https://web.archive.org/web/20231125115519/https://www.fao.org/3/ac854t/AC854T00.htm))
 - [Report of a Sub-Committee of the 2011 FAO Consultation on 'Protein Quality Evaluation in Human Nutrition'](https://www.fao.org/ag/humannutrition/36216-04a2f02ec02eafd4f457dd2c9851b4c45.pdf)
