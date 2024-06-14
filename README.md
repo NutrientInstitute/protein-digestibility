@@ -6,7 +6,7 @@ To provide feedback on this app or sign up to be notified about future releases,
 
 
 ## What is in this repository?
-This repository contains the resources used to run the [Protein Digestibility & Quality Data Hub app](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/). The code used to generate the app can be found in the [app.R](https://github.com/NutrientInstitute/protein-digestibility/blob/main/app.R) file; additional information on specific data files and variables can be found in the [data dictionary](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Data%20Dictionary_6.13.24.pdf). 
+This repository contains the resources used to run the [Protein Digestibility & Quality Data Hub app](https://nutrientinstitute.shinyapps.io/ProteinDigestibilityData/). The code used to generate the app can be found in the [app.R](https://github.com/NutrientInstitute/protein-digestibility/blob/main/app.R) file; additional information on specific data files and variables can be found in the [data dictionary](https://github.com/NutrientInstitute/protein-digestibility/blob/main/Data%20Dictionar.pdf). 
 
 
 
