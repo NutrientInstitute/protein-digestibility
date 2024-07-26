@@ -7,9 +7,9 @@ library(fontawesome)
 library(shinyjs)
 library(bslib)
 
-Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/NutrientInstitute/protein-digestibility/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv") %>%
-# Protein_Digestibility_Data <-
-#     read_csv("Protein Digestibility Data  - full data.csv") %>%
+# Protein_Digestibility_Data <- read_csv("https://raw.githubusercontent.com/NutrientInstitute/protein-digestibility/main/Protein%20Digestibility%20Data%20%20-%20full%20data.csv") %>%
+ Protein_Digestibility_Data <-
+     read_csv("Protein Digestibility Data  - full data.csv") %>%
     select(!Notes)
 EAA_composition <- read_csv("EAA_composition.csv") %>%
     drop_na(Protein) %>%
@@ -18,7 +18,7 @@ scoring_pattern <- read_csv("scoring_pattern.csv")
 portion_sizes <- read_csv("portion_sizes.csv")
 
 
-fileName <- "Protein & Amino Acid Hub"
+fileName <- "Protein Quality Hub"
 
 # shiny app
 ui <- fluidPage(
@@ -85,7 +85,7 @@ ui <- fluidPage(
         fluidRow(br()),
         withMathJax(),
         fluidRow(
-            column(5, h1("Protein & Amino Acid Hub")),
+            column(5, h1("Protein Quality Hub")),
             actionButton(
                 "gitbutton",
                 label = tags$h5(
@@ -118,266 +118,6 @@ ui <- fluidPage(
         fluidRow(br()),
         useShinyjs(),
         navset_tab(
-            nav_panel(
-                "Protein Digestibility Data",
-                fluidRow(
-                    div(
-                        id = "info-toggle",
-                        class = "accordion-toggle",
-                        onclick = "if (event.target === this || event.target.tagName === 'P' || event.target.className.includes('column')) { Shiny.setInputValue('info_toggle_click', Math.random(), {priority: 'event'}); }",
-                        column(
-                            8,
-                            p("Information", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
-                        ),
-                        column(4, uiOutput("toggleButton"))
-                    )
-                ),
-                fluidRow(hidden(
-                    div(
-                        id = "infoContent",
-                        class = "accordion-content",
-                        style = "background-color: #F6F6F6;padding-left: 30px;padding-right: 20px; padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
-                        p(
-                            "The Protein Digestibility Hub Project serves as a dedicated repository for protein digestibility information, addressing a critical gap in accessible data. For more information see the Protein Digestibility Hub ",
-                            a(href = "https://github.com/NutrientInstitute/protein-digestibility", "github page."),
-                            " Please contact ",
-                            a(href = "https://www.nutrientinstitute.org/protein-digestibility-feedback", "Nutrient Institute"),
-                            "to report problems or provide feedback."
-                        ),
-                        br(),
-                        p(
-                            "Currently, the Protein Digestibility Hub contains data from the following sources:"
-                        ),
-                        tags$ul(
-                            tags$li(
-                                a(
-                                    href = "https://www.ars.usda.gov/arsuserfiles/80400535/data/classics/usda%20handbook%2074.pdf",
-                                    "USDA ENERGY VALUE OF FOODS (Agricultural Handbook No. 74, 1955)"
-                                )
-                            ),
-                            tags$li(
-                                "AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970) ",
-                                br(),
-                                tags$small(
-                                    tags$i(
-                                        "(",
-                                        tags$b("Note"),
-                                        ": The original publication has been removed from the FAO website, but can still be accessed via the ",
-                                        tags$a(href = "https://web.archive.org/web/20231125115519/https://www.fao.org/3/ac854t/AC854T00.htm", "Wayback Machine"),
-                                        ")"
-                                    )
-                                )
-                            ),
-                            tags$li(
-                                a(
-                                    href = "https://www.fao.org/ag/humannutrition/36216-04a2f02ec02eafd4f457dd2c9851b4c45.pdf",
-                                    "Report of a Sub-Committee of the 2011 FAO Consultation on 'Protein Quality Evaluation in Human Nutrition'"
-                                )
-                            ),
-                            tags$li(
-                                a(
-                                    href = "https://doi.org/10.17226/13298",
-                                    "Nutrient Requirements of Swine: Eleventh Revised Edition (NRC 2012)",
-                                    tags$b("**")
-                                )
-                            )
-                        ),
-                        br(),
-                        tags$small(
-                            p(
-                                tags$b("**"),
-                                "Digestibility and protein data from ",
-                                tags$i(
-                                    "Nutrient Requirements of Swine: Eleventh Revised Edition (NRC 2012)"
-                                ),
-                                "  was collected from the following sources:"
-                            ),
-                            tags$ol(
-                                tags$li(
-                                    "AAFCO (Association of American Feed Control Officials). 2010. Official Publication. Oxford, IN: AAFCO."
-                                ),
-                                tags$li("AminoDat 4.0. 2010. Evonik Industries, Hanau, Germany."),
-                                tags$li(
-                                    "Cera, K. R., D. C. Mahan, and G. A. Reinhart. 1989. Apparent fat digestibilities and performance responses of postweaning swine fed diets supplemented with coconut oil, corn oil or tallow. Journal of Animal Science 67:2040-2047."
-                                ),
-                                tags$li(
-                                    "CVB (Dutch PDV [Product Board Animal Feed]). 2008. CVB Feedstuff Database. Available online at http://www.pdv.nl/english/Voederwaardering/about_cvb/index.php. Accessed on June 9, 2011."
-                                ),
-                                tags$li(
-                                    "NRC (National Research Council). 1998. Nutrient Requirements of Swine, 10th Rev. Ed. Washington, DC: National Academy Press."
-                                ),
-                                tags$li(
-                                    "NRC. 2007. Nutrient Requirements of Horses, 6th Rev. Ed. Washington, DC: The National Academies Press."
-                                ),
-                                tags$li(
-                                    "Powles, J., J. Wiseman, D. J. A. Cole, and S. Jagger. 1995. Prediction of the apparent digestible energy value of fats given to pigs. Animal Science 61:149-154."
-                                ),
-                                tags$li(
-                                    "Sauvant, D., J. M. Perez, and G. Tran. 2004. Tables of Composition and Nutritional Value of Feed Materials: Pigs, Poultry, Sheep, Goats, Rabbits, Horses, Fish, INRA, Paris, France, ed. Wageningen, the Netherlands: Wageningen Academic."
-                                ),
-                                tags$li(
-                                    "USDA (U.S. Department of Agriculture), Agricultural Research Service. 2010. USDA National Nutrient Database for Standard Reference, Release 23. Nutrient Data Laboratory Home Page. Available online at http://www.ars.usda.gov/ba/bhnrc/ndl. Accessed on August 10, 2011."
-                                ),
-                                tags$li(
-                                    "van Milgen, J., J. Noblet, and S. Dubois. 2001. Energetic efficiency of starch, protein, and lipid utilization in growing pigs. Journal of Nutrition 131:1309-1318."
-                                )
-                            )
-                        )
-                    )
-                )),
-                fluidRow(br()),
-                # Create a new Row in the UI for selectInputs
-                fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px solid #bdbdbd;font-weight: bold;",
-                         column(
-                             2,
-                             p("Filters", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
-                         )),
-                fluidRow(
-                    style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
-                    column(
-                        2,
-                        virtualSelectInput(
-                            inputId = "species",
-                            label = "Species:",
-                            choices = c("human", "human (predicted from pig)", "pig", "rat"),
-                            selected = c(unique(
-                                as.character(Protein_Digestibility_Data$Species)
-                            )),
-                            multiple = TRUE,
-                            showValueAsTags = TRUE,
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        2,
-                        virtualSelectInput(
-                            inputId = "model",
-                            label = "Model:",
-                            choices = c("in vivo", "in vitro"),
-                            selected = c(unique(
-                                as.character(Protein_Digestibility_Data$Model)
-                            )),
-                            multiple = TRUE,
-                            showValueAsTags = TRUE,
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        2,
-                        virtualSelectInput(
-                            inputId = "sample",
-                            label = "Sample:",
-                            choices = c("fecal", "ileal"),
-                            selected = c(unique(
-                                as.character(Protein_Digestibility_Data$Sample)
-                            )),
-                            multiple = TRUE,
-                            showValueAsTags = TRUE,
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        2,
-                        virtualSelectInput(
-                            inputId = "measure",
-                            label = "Measure:",
-                            choices = c(
-                                "apparent digestibility",
-                                "standardized digestibility",
-                                "true digestibility",
-                                "biological value",
-                                "metabolic activity"
-                            ),
-                            selected = c(unique(
-                                as.character(Protein_Digestibility_Data$Measure)
-                            )),
-                            multiple = TRUE,
-                            showValueAsTags = TRUE,
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        4,
-                        virtualSelectInput(
-                            inputId = "analyte",
-                            label = "Analyte:",
-                            choices = list(
-                                "crude protein" = "crude protein",
-                                "Essential amino acid" = c(
-                                    "histidine",
-                                    "isoleucine",
-                                    "leucine",
-                                    "lysine",
-                                    "reactive lysine",
-                                    "methionine",
-                                    "phenylalanine",
-                                    "threonine",
-                                    "tryptophan",
-                                    "valine"
-                                ),
-                                "Conditionally essential amino acid" = c("arginine", "cysteine", "glycine", "proline", "tyrosine"),
-                                "Non-essential amino acid" = c("alanine", "aspartic acid", "glutamic acid",  "serine")
-                            ),
-                            selected = unique(as.character(Protein_Digestibility_Data$Analyte)),
-                            showValueAsTags = TRUE,
-                            multiple = TRUE,
-                            width = '100%'
-                        )
-                    )
-                ),
-                fluidRow(br()),
-                # Create a new Row in the UI for search options
-                fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px solid #bdbdbd;font-weight: bold;",
-                         column(
-                             2,
-                             p("Search", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
-                         )),
-                fluidRow(
-                    style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
-                    column(
-                        2,
-                        textInput(
-                            inputId = "NI_ID_tab1",
-                            label = "NI_ID:",
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        2,
-                        textInput(
-                            inputId = "foodGrp",
-                            label = "Food group:",
-                            width = '100%'
-                        )
-                    ),
-                    column(2,
-                           textInput(
-                               inputId = "food",
-                               label = "Food:",
-                               width = '100%'
-                           )),
-                    column(
-                        2,
-                        textInput(
-                            inputId = "analysisMethod",
-                            label = "Analysis method:",
-                            width = '100%'
-                        )
-                    ),
-                    column(
-                        2,
-                        textInput(
-                            inputId = "source",
-                            label = "Sources:",
-                            width = '100%'
-                        )
-                    )
-                ),
-                fluidRow(br()),
-                # Create a new row for the table.
-                fluidRow(style = "padding-top: 20px;",
-                         DT::dataTableOutput("table"))
-            ),
             nav_panel(
                 "Protein Quality Scoring",
                 fluidRow(
@@ -709,6 +449,266 @@ ui <- fluidPage(
                          DT::dataTableOutput("table_2"))
             ),
             nav_panel(
+                "Protein Digestibility Data",
+                fluidRow(
+                    div(
+                        id = "info-toggle",
+                        class = "accordion-toggle",
+                        onclick = "if (event.target === this || event.target.tagName === 'P' || event.target.className.includes('column')) { Shiny.setInputValue('info_toggle_click', Math.random(), {priority: 'event'}); }",
+                        column(
+                            8,
+                            p("Information", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
+                        ),
+                        column(4, uiOutput("toggleButton"))
+                    )
+                ),
+                fluidRow(hidden(
+                    div(
+                        id = "infoContent",
+                        class = "accordion-content",
+                        style = "background-color: #F6F6F6;padding-left: 30px;padding-right: 20px; padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
+                        p(
+                            "The Protein Digestibility Hub Project serves as a dedicated repository for protein digestibility information, addressing a critical gap in accessible data. For more information see the Protein Digestibility Hub ",
+                            a(href = "https://github.com/NutrientInstitute/protein-digestibility", "github page."),
+                            " Please contact ",
+                            a(href = "https://www.nutrientinstitute.org/protein-digestibility-feedback", "Nutrient Institute"),
+                            "to report problems or provide feedback."
+                        ),
+                        br(),
+                        p(
+                            "Currently, the Protein Digestibility Hub contains data from the following sources:"
+                        ),
+                        tags$ul(
+                            tags$li(
+                                a(
+                                    href = "https://www.ars.usda.gov/arsuserfiles/80400535/data/classics/usda%20handbook%2074.pdf",
+                                    "USDA ENERGY VALUE OF FOODS (Agricultural Handbook No. 74, 1955)"
+                                )
+                            ),
+                            tags$li(
+                                "AMINO-ACID CONTENT OF FOODS AND BIOLOGICAL DATA ON PROTEINS (FAO 1970) ",
+                                br(),
+                                tags$small(
+                                    tags$i(
+                                        "(",
+                                        tags$b("Note"),
+                                        ": The original publication has been removed from the FAO website, but can still be accessed via the ",
+                                        tags$a(href = "https://web.archive.org/web/20231125115519/https://www.fao.org/3/ac854t/AC854T00.htm", "Wayback Machine"),
+                                        ")"
+                                    )
+                                )
+                            ),
+                            tags$li(
+                                a(
+                                    href = "https://www.fao.org/ag/humannutrition/36216-04a2f02ec02eafd4f457dd2c9851b4c45.pdf",
+                                    "Report of a Sub-Committee of the 2011 FAO Consultation on 'Protein Quality Evaluation in Human Nutrition'"
+                                )
+                            ),
+                            tags$li(
+                                a(
+                                    href = "https://doi.org/10.17226/13298",
+                                    "Nutrient Requirements of Swine: Eleventh Revised Edition (NRC 2012)",
+                                    tags$b("**")
+                                )
+                            )
+                        ),
+                        br(),
+                        tags$small(
+                            p(
+                                tags$b("**"),
+                                "Digestibility and protein data from ",
+                                tags$i(
+                                    "Nutrient Requirements of Swine: Eleventh Revised Edition (NRC 2012)"
+                                ),
+                                "  was collected from the following sources:"
+                            ),
+                            tags$ol(
+                                tags$li(
+                                    "AAFCO (Association of American Feed Control Officials). 2010. Official Publication. Oxford, IN: AAFCO."
+                                ),
+                                tags$li("AminoDat 4.0. 2010. Evonik Industries, Hanau, Germany."),
+                                tags$li(
+                                    "Cera, K. R., D. C. Mahan, and G. A. Reinhart. 1989. Apparent fat digestibilities and performance responses of postweaning swine fed diets supplemented with coconut oil, corn oil or tallow. Journal of Animal Science 67:2040-2047."
+                                ),
+                                tags$li(
+                                    "CVB (Dutch PDV [Product Board Animal Feed]). 2008. CVB Feedstuff Database. Available online at http://www.pdv.nl/english/Voederwaardering/about_cvb/index.php. Accessed on June 9, 2011."
+                                ),
+                                tags$li(
+                                    "NRC (National Research Council). 1998. Nutrient Requirements of Swine, 10th Rev. Ed. Washington, DC: National Academy Press."
+                                ),
+                                tags$li(
+                                    "NRC. 2007. Nutrient Requirements of Horses, 6th Rev. Ed. Washington, DC: The National Academies Press."
+                                ),
+                                tags$li(
+                                    "Powles, J., J. Wiseman, D. J. A. Cole, and S. Jagger. 1995. Prediction of the apparent digestible energy value of fats given to pigs. Animal Science 61:149-154."
+                                ),
+                                tags$li(
+                                    "Sauvant, D., J. M. Perez, and G. Tran. 2004. Tables of Composition and Nutritional Value of Feed Materials: Pigs, Poultry, Sheep, Goats, Rabbits, Horses, Fish, INRA, Paris, France, ed. Wageningen, the Netherlands: Wageningen Academic."
+                                ),
+                                tags$li(
+                                    "USDA (U.S. Department of Agriculture), Agricultural Research Service. 2010. USDA National Nutrient Database for Standard Reference, Release 23. Nutrient Data Laboratory Home Page. Available online at http://www.ars.usda.gov/ba/bhnrc/ndl. Accessed on August 10, 2011."
+                                ),
+                                tags$li(
+                                    "van Milgen, J., J. Noblet, and S. Dubois. 2001. Energetic efficiency of starch, protein, and lipid utilization in growing pigs. Journal of Nutrition 131:1309-1318."
+                                )
+                            )
+                        )
+                    )
+                )),
+                fluidRow(br()),
+                # Create a new Row in the UI for selectInputs
+                fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px solid #bdbdbd;font-weight: bold;",
+                         column(
+                             2,
+                             p("Filters", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
+                         )),
+                fluidRow(
+                    style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
+                    column(
+                        2,
+                        virtualSelectInput(
+                            inputId = "species",
+                            label = "Species:",
+                            choices = c("human", "human (predicted from pig)", "pig", "rat"),
+                            selected = c(unique(
+                                as.character(Protein_Digestibility_Data$Species)
+                            )),
+                            multiple = TRUE,
+                            showValueAsTags = TRUE,
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        2,
+                        virtualSelectInput(
+                            inputId = "model",
+                            label = "Model:",
+                            choices = c("in vivo", "in vitro"),
+                            selected = c(unique(
+                                as.character(Protein_Digestibility_Data$Model)
+                            )),
+                            multiple = TRUE,
+                            showValueAsTags = TRUE,
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        2,
+                        virtualSelectInput(
+                            inputId = "sample",
+                            label = "Sample:",
+                            choices = c("fecal", "ileal"),
+                            selected = c(unique(
+                                as.character(Protein_Digestibility_Data$Sample)
+                            )),
+                            multiple = TRUE,
+                            showValueAsTags = TRUE,
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        2,
+                        virtualSelectInput(
+                            inputId = "measure",
+                            label = "Measure:",
+                            choices = c(
+                                "apparent digestibility",
+                                "standardized digestibility",
+                                "true digestibility",
+                                "biological value",
+                                "metabolic activity"
+                            ),
+                            selected = c(unique(
+                                as.character(Protein_Digestibility_Data$Measure)
+                            )),
+                            multiple = TRUE,
+                            showValueAsTags = TRUE,
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        4,
+                        virtualSelectInput(
+                            inputId = "analyte",
+                            label = "Analyte:",
+                            choices = list(
+                                "crude protein" = "crude protein",
+                                "Essential amino acid" = c(
+                                    "histidine",
+                                    "isoleucine",
+                                    "leucine",
+                                    "lysine",
+                                    "reactive lysine",
+                                    "methionine",
+                                    "phenylalanine",
+                                    "threonine",
+                                    "tryptophan",
+                                    "valine"
+                                ),
+                                "Conditionally essential amino acid" = c("arginine", "cysteine", "glycine", "proline", "tyrosine"),
+                                "Non-essential amino acid" = c("alanine", "aspartic acid", "glutamic acid",  "serine")
+                            ),
+                            selected = unique(as.character(Protein_Digestibility_Data$Analyte)),
+                            showValueAsTags = TRUE,
+                            multiple = TRUE,
+                            width = '100%'
+                        )
+                    )
+                ),
+                fluidRow(br()),
+                # Create a new Row in the UI for search options
+                fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px solid #bdbdbd;font-weight: bold;",
+                         column(
+                             2,
+                             p("Search", style = "font-weight: bold;font-size: 20px; padding-top:10px;")
+                         )),
+                fluidRow(
+                    style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
+                    column(
+                        2,
+                        textInput(
+                            inputId = "NI_ID_tab1",
+                            label = "NI_ID:",
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        2,
+                        textInput(
+                            inputId = "foodGrp",
+                            label = "Food group:",
+                            width = '100%'
+                        )
+                    ),
+                    column(2,
+                           textInput(
+                               inputId = "food",
+                               label = "Food:",
+                               width = '100%'
+                           )),
+                    column(
+                        2,
+                        textInput(
+                            inputId = "analysisMethod",
+                            label = "Analysis method:",
+                            width = '100%'
+                        )
+                    ),
+                    column(
+                        2,
+                        textInput(
+                            inputId = "source",
+                            label = "Sources:",
+                            width = '100%'
+                        )
+                    )
+                ),
+                fluidRow(br()),
+                # Create a new row for the table.
+                fluidRow(style = "padding-top: 20px;",
+                         DT::dataTableOutput("table"))
+            ),
+            nav_panel(
                 "AA Composition Data",
                 fluidRow(
                     div(
@@ -881,7 +881,7 @@ server <- function(input, output, session) {
         )
     })
 
-    observeEvent(input$EAA_rec, {
+    observeEvent(input$EAA_rec_PDCAAS, {
         age_options <- scoring_pattern %>%
             filter(`Pattern Name` == input$EAA_rec_PDCAAS)
 
@@ -892,7 +892,7 @@ server <- function(input, output, session) {
         )
     })
 
-    observeEvent(input$EAA_rec, {
+    observeEvent(input$EAA_rec_DIAAS, {
         age_options <- scoring_pattern %>%
             filter(`Pattern Name` == input$EAA_rec_DIAAS)
 
@@ -1005,10 +1005,8 @@ server <- function(input, output, session) {
             formatStyle(
                 14:15,
                 'overflow-wrap' = 'break-word',
-                'word-break' = 'break-word',
-                width = '10%'
-            ) %>%
-            formatStyle(15, width = '10%')
+                'word-break' = 'break-word'
+            )
     })
 
     # render table for protein quality scores
@@ -1110,11 +1108,15 @@ server <- function(input, output, session) {
                     } else{
                         EAA_9 <- EAA_composition %>%
                             mutate(value = value * 1000) %>%
-                            mutate(value = value * (input$serving_weight /
-                                                        100)) %>%
+                            mutate(value = value * (input$serving_weight / 100)) %>%
                             mutate(portion = paste0(input$serving_weight, " g")) %>%
-                            mutate(AA = tolower(AA)) %>%
-                            left_join(scoring_pattern_alt) %>%
+                            left_join(
+                                scoring_pattern %>%
+                                    rename("AA" = "Analyte") %>%
+                                    filter(`Pattern Name` == input$EAA_rec) %>%
+                                    filter(ifelse(is.character(input$rec_age), Age == input$rec_age, !is.na(Age))) %>%
+                                    select(AA, Amount)
+                            ) %>%
                             mutate(value = value / (Amount * input$weight)) %>%
                             select(fdcId,
                                    NI_ID,
@@ -1195,7 +1197,7 @@ server <- function(input, output, session) {
                                     filter(ifelse(is.character(input$rec_age), Age == input$rec_age, !is.na(Age))) %>%
                                     select(AA, Amount)
                                 ) %>%
-                            mutate(calculation = paste0(value, "/", Amount * input$weight)) %>%
+                            mutate(calculation = paste0(round(value,2), "/", round(Amount * input$weight, 2))) %>%
                             mutate(value = value / (Amount * input$weight)) %>%
                             select(fdcId, NI_ID, Protein, portion, value, AA, calculation)
 
@@ -2091,14 +2093,14 @@ server <- function(input, output, session) {
         }
         DT::datatable(
             PQ_df %>%
-                mutate(
-                    fdcId = paste0(
-                        "Haytowitz DB, Ahuja JKC, Wu X, Somanchi M, Nickle M, Nguyen QA, et al. USDA National Nutrient Database for Standard Reference, Legacy Release. In: FoodData Central.  Nutrient Data Laboratory, Beltsville Human Nutrition Research Center, ARS, USDA; 2019.  https://doi.org/10.15482/USDA.ADC/1529216. Accessed May 27, 2022. <br> fdcId: ",
-                        fdcId
-                    )
-                ) %>%
+                # mutate(
+                #     fdcId = paste0(
+                #         "Haytowitz DB, Ahuja JKC, Wu X, Somanchi M, Nickle M, Nguyen QA, et al. USDA National Nutrient Database for Standard Reference, Legacy Release. In: FoodData Central.  Nutrient Data Laboratory, Beltsville Human Nutrition Research Center, ARS, USDA; 2019.  https://doi.org/10.15482/USDA.ADC/1529216. Accessed May 27, 2022. <br> fdcId: ",
+                #         fdcId
+                #     )
+                # ) %>%
                 arrange(NI_ID) %>%
-                rename("Food Composition Data Citation" = "fdcId") %>%
+                mutate("Food Composition Ref No" = 1) %>%
                 filter(`Digestibility Sample` %in% input$pq_sample) %>%
                 filter(`Digestibility Measure` %in% input$pq_measure) %>%
                 filter(`Digestibility Species` %in% input$pq_species),
@@ -2147,7 +2149,7 @@ server <- function(input, output, session) {
                 select(FDC_ID, description, Protein, AA, value) %>%
                 distinct() %>%
                 mutate(AA = factor(AA,
-                                   levels = c("Histidine", "Isoleucine", "Leucine", "Lysine", "Methionine", "Phenylalanine", "Threonine", "Tryptophan", "Valine"),
+                                   levels = c("histidine", "isoleucine", "leucine", "lysine", "methionine+cysteine", "phenylalanine+tyrosine", "threonine", "tryptophan", "valine"),
                                    labels = c("His (g/100g)", "Ile (g/100g)", "Leu (g/100g)", "Lys (g/100g)", "Met+Cys (g/100g)", "Phe+Tyr (g/100g)", "Thr (g/100g)", "Trp (g/100g)", "Val (g/100g)"))) %>%
                 pivot_wider(names_from = "AA", values_from = "value") %>%
                 rename("Protein (g/100g)" = "Protein") %>%
@@ -2162,7 +2164,7 @@ server <- function(input, output, session) {
                 select(NI_ID, FDC_ID, description, Protein, AA, value) %>%
                 distinct() %>%
                 mutate(AA = factor(AA,
-                                   levels = c("Histidine", "Isoleucine", "Leucine", "Lysine", "Methionine", "Phenylalanine", "Threonine", "Tryptophan", "Valine"),
+                                   levels = c("histidine", "isoleucine", "leucine", "lysine", "methionine+cysteine", "phenylalanine+tyrosine", "threonine", "tryptophan", "valine"),
                                    labels = c("His (g/100g)", "Ile (g/100g)", "Leu (g/100g)", "Lys (g/100g)", "Met+Cys (g/100g)", "Phe+Tyr (g/100g)", "Thr (g/100g)", "Trp (g/100g)", "Val (g/100g)"))) %>%
                 pivot_wider(names_from = "AA", values_from = "value") %>%
                 rename("Protein (g/100g)" = "Protein") %>%
