@@ -11,30 +11,30 @@ library(openxlsx)
 fuzzy_search_filter <- function(df, search_term) {
   if (search_term == "") return(df)
 
-  # Clean and tokenize search term
   clean_text <- function(x) {
     x <- tolower(x)
-    x <- gsub("'s\\b", "", x)         # Remove possessive 's
-    x <- gsub("[^a-z0-9\\s]", " ", x) # Remove punctuation, keep alphanum and spaces
-    x <- gsub("\\s+", " ", x)         # Collapse multiple spaces
+    x <- gsub("'s\\b", "", x)
+    x <- gsub("[^a-z0-9\\s]", " ", x)
+    x <- gsub("\\s+", " ", x)
     trimws(x)
   }
 
   search_tokens <- strsplit(clean_text(search_term), "\\s+")[[1]]
 
-  df %>%
-    filter(
-      if_any(
-        everything(),
-        ~ {
-          x <- tolower(as.character(.))
-          x[is.na(x)] <- ""
-          x <- clean_text(x)
-          sapply(x, function(val) all(search_tokens %in% strsplit(val, " ")[[1]]))
-        }
-      )
-    )
+  # Combine all columns into one string per row
+  df$.__combined__ <- apply(df, 1, function(row) clean_text(paste(row, collapse = " ")))
+
+  # Filter rows where all search tokens appear (substring match)
+  df_filtered <- df[apply(df, 1, function(row) {
+    val <- clean_text(paste(row, collapse = " "))
+    all(sapply(search_tokens, function(tok) grepl(tok, val, fixed = TRUE)))
+  }), ]
+
+  df_filtered$.__combined__ <- NULL  # Clean up
+  return(df_filtered)
 }
+
+
 
 Protein_Correction <-
   read_csv("Correction Factors - full data.csv") %>%
@@ -43,6 +43,7 @@ Protein_Correction <-
   select(!Notes) %>%
   select(!Diet) %>%
   select(!`Food group`) %>%
+  select(!Model) %>%
   filter(Calculation != "biological value")
 EAA_composition <- read_csv("EAA_composition.csv") %>%
   pivot_longer(histidine:valine, names_to = "AA", values_to = "value") %>%
@@ -217,6 +218,43 @@ ui <- fluidPage(
         border-color: rgb(0, 0, 0) rgb(0, 0, 0) transparent;
         border-radius: 4px 4px 0 0;
       }
+
+    /* Style default browser tooltips - only in table headers */
+thead th[title] {
+  position: relative;
+}
+
+thead th[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  white-space: pre-line;
+  top: 100%;
+  left: 0;
+  z-index: 9999;
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: normal;
+  min-width: 200px;
+  max-width: 800px;
+  line-height: 1.3;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+thead th[title]:hover::before {
+  content: '';
+  position: absolute;
+  top: 95%;
+  left: 10px;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+  z-index: 9999;
+}
+
     "
     )
   ))
@@ -257,6 +295,61 @@ ui <- fluidPage(
     ),
     fluidRow(br()),
     useShinyjs(),
+    tags$script(HTML("
+  $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"]', function(e) {
+    setTimeout(function() {
+      $.fn.dataTable.tables({visible: true, api: true}).each(function() {
+        var table = $(this).DataTable();
+
+        // Destroy and recreate FixedHeader to reset
+        if (table.fixedHeader) {
+          table.fixedHeader.disable();
+          table.fixedHeader.enable();
+        }
+
+        table.columns.adjust();
+      });
+      $(window).trigger('resize');
+    }, 100);
+  });
+
+  // Handle table initialization and redraws
+  $(document).on('init.dt draw.dt', function(e) {
+    var table = $(e.target).DataTable();
+
+    setTimeout(function() {
+      if (table.fixedHeader) {
+        table.fixedHeader.adjust();
+
+        // Force header alignment
+        var headerCells = $(table.table().header()).find('th');
+        var fixedHeaderCells = $('.fixedHeader-floating th');
+
+        headerCells.each(function(i) {
+          var width = $(this).outerWidth();
+          fixedHeaderCells.eq(i).css('width', width + 'px');
+        });
+      }
+    }, 50);
+  });
+
+  // Handle window resize
+  $(window).on('resize', function() {
+    $.fn.dataTable.tables({visible: true, api: true}).each(function() {
+      var table = $(this).DataTable();
+      if (table.fixedHeader) {
+        table.fixedHeader.adjust();
+      }
+    });
+  });
+
+  // Initial setup
+  $(document).ready(function() {
+    setTimeout(function() {
+      $(window).trigger('resize');
+    }, 500);
+  });
+")),
     navset_tab(
       nav_panel(
         "Protein Quality Scoring",
@@ -319,14 +412,14 @@ ui <- fluidPage(
               tags$sup("2")
             ),
             p(
-              "Intended application: DIAAS values represent the ratio between the quality of 1 gram of protein from a food source compared to a reference gram of protein. In practice, the score can be used to compare the protein quality between food sources on a per gram basis."
+              "Intended application: DIAAS values represent the ratio between the quantity of digestible amino acids of 1 gram of protein from a food source compared to a reference gram of protein. In practice, the score can be used to compare the protein quality between food sources on a per gram basis."
             ),
             p(br(), style = "margin-bottom: -15px;"),
             p(
-              "The DIAAS calculation is based on the ratio of limiting amino acid in a gram of protein compared to the same amino acid in a reference protein, adjusted for digestibility. Unlike PDCAAS, DIAAS is not truncated at 1 (i.e. 100%) and is  calculated using ileal digestibility.*"
+              "The DIAAS calculation is based on the ratio of limiting amino acid in a gram of protein compared to the same amino acid in a reference protein, adjusted for digestibility. Unlike PDCAAS, DIAAS is not truncated at 1 (i.e. 100%) and is calculated using ileal digestibility of individual amino acids. This means that the limiting amino acid is determined from both digestibility and amino acid content, rather than amino acid content alone*"
             ),
             p(br(), style = "margin-bottom: -15px;"),
-            '\\(\\text{DIAAS}=100\\times\\frac{\\text{mg of digestible dietary indispensable amino acid in 1 g of the dietary protein}}{\\text{mg of the same dietary indispensable amino acid in 1g of the reference protein}}\\times\\text{digestibility}\\)',
+            '\\(\\text{DIAAS}=\\frac{\\text{mg of digestible dietary indispensable amino acid in 1 g of the dietary protein}}{\\text{mg of the same dietary indispensable amino acid in 1g of the reference protein}}\\times100\\)',
             p(br()),
             h4("EAA-9:", tags$sup("3")),
             p(
@@ -335,7 +428,7 @@ ui <- fluidPage(
             p(br(), style = "margin-bottom: -15px;"),
             # " Calculation is based on the minimum percentage of the RDA met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid.",
             p(
-              "The EAA-9 calculation is based on the minimum percentage of the RDA (or personalized EAA recommendations) met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid corrected for bioavailability (if correction factor is available). EAA RDAs are satisfied when the EAA-9 score for foods consumed in a day reaches 100%."
+              "The EAA-9 calculation is based on the minimum percentage of the RDA (or personalized EAA recommendations) met per serving(s) of food, where the minimum is the lowest percentage met by a single amino acid corrected for bioavailability (if correction factor is available). EAA-9 can be calculated using correction factors for either crude protein or individual amino acids. EAA RDAs are satisfied when the EAA-9 score for foods consumed in a day reaches 100%."
             ),
             p(br(), style = "margin-bottom: -15px;"),
             '\\(\\text{EAA-9}=min(\\frac{\\text{His Present}}{\\text{His RDA}},\\frac{\\text{Ile Present}}{\\text{Ile RDA}},\\frac{\\text{Leu Present}}{\\text{Leu RDA}},\\frac{\\text{Lys Present}}{\\text{Lys RDA}},\\frac{\\text{Met Present}}{\\text{Met RDA}},\\frac{\\text{Phe Present}}{\\text{Phe RDA}},\\frac{\\text{Thr Present}}{\\text{Thr RDA}},\\frac{\\text{Trp Present}}{\\text{Trp RDA}},\\frac{\\text{Val Present}}{\\text{Val RDA}})\\times100\\times\\text{Correction Factor}\\)',
@@ -439,12 +532,13 @@ fluidRow(
         label = "Score(s)",
         choices = c("PDCAAS", "DIAAS", "EAA-9")
       ),
+      conditionalPanel(  condition = "input.score != ''",
       radioButtons(
         inputId = "show_calc",
         label = "Score calculation",
         choiceNames = c("Show calculation and score", "Show score only"),
         choiceValues = c("show_calc", "score_only")
-      )
+      ))
     ),
     column(
       3,
@@ -606,23 +700,26 @@ fluidRow(
             )
           ),
           div(
-            style = "background-color: #fff3cd; border-left: 5px solid #ffc107;
-           padding: 1px 8px; margin: 5px 0; border-radius: 5px;
-           font-weight: bold; font-size: 14px; color: #856404; max-width:97%;",
+            style = "background-color: #EDEDED; border-left: 4px solid #A6A09B;
+           padding: 1px 8px; margin: 1px 0; border-radius: 4px;
+           font-weight: 500; font-size: 14px; color: #212529; max-width:97%;",
            checkboxInput(
              inputId = "require_bioavail",
-             label = "Require correction factor for calculation",
+             label = "Only see EAA-9 scores for foods with correction factors",
              value = FALSE
            )
-          ),
+          )
 
-          uiOutput("eaa9_note"),
+          ,
+
+          # uiOutput("eaa9_note"),
 
 
         )
       )
     )
   ),
+  conditionalPanel(  condition = "input.score != ''",
   fluidRow(
     style = "margin-bottom: -5px;",
     p("Correction Factors", style = "font-size: 15px;font-weight: 500;color: #808080;margin-bottom: -2px;margin-top:5px;"),
@@ -634,7 +731,7 @@ fluidRow(
           inputId = "pq_species",
           label = "Species",
           choices = c("human", "human (predicted from swine)", "swine", "rat"),
-          selected = c("human")
+          selected = c("human", "human (predicted from swine)", "swine", "rat")
         )
       ),
       column(
@@ -648,7 +745,7 @@ fluidRow(
           inputId = "pq_analyte",
           label = "Protein Form",
           choices = c("crude protein", "individual amino acids"),
-          selected = "individual amino acids"
+          selected = c("crude protein", "individual amino acids")
         )
       ),
       column(
@@ -661,14 +758,18 @@ fluidRow(
             "apparent digestibility",
             "standardized digestibility"
           ),
-          selected = "true digestibility"
+          selected = c(
+            "true digestibility",
+            "apparent digestibility",
+            "standardized digestibility"
+          )
         )
       ),
-      uiOutput("default_correction_note"),
+      # uiOutput("default_correction_note"),
     )
 
   )
-),
+)),
 fluidRow(br()),
 # Create download button
 fluidRow(
@@ -881,7 +982,7 @@ nav_panel(
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Sample Location</td><td style=\"border: 1px solid #ccc; padding: 8px;\">The type  or location of sample collected for analysis (e.g. ileal, fecal, etc...)</td></tr>
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Calculation</td><td style=\"border: 1px solid #ccc; padding: 8px;\">The name of the correction factor (i.e. apparent digestibility, metabolic availability, etc...)</td></tr>
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Protein Form</td><td style=\"border: 1px solid #ccc; padding: 8px;\">The protein or amino acid for which correction factor coefficient is provided</td></tr>
-    <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Model</td><td style=\"border: 1px solid #ccc; padding: 8px;\">Experimental model (either in vivo or in vitro)</td></tr>
+    <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Model<span style=\"font-style: italic; color: #888; font-size: 90%;\">(not in table - available in <a href='https://github.com/NutrientInstitute/protein-quality-hub' target='_blank' style=\"color: #3b6ea5; text-decoration: underline;\">github</a>)</span></td><td style=\"border: 1px solid #ccc; padding: 8px;\">Experimental model (either in vivo or in vitro)</td></tr>
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Protein (g)</td><td style=\"border: 1px solid #ccc; padding: 8px;\">Amount of protein (in grams) from the applicable food ingested (in the case of in vivo analysis) or analyzed (in the case of in vitro analysis)</td></tr>
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">n</td><td style=\"border: 1px solid #ccc; padding: 8px;\">Number of subjects from which in vivo data was collected (if applicable)</td></tr>
     <tr><td style=\"border: 1px solid #ccc; padding: 8px;\">Analysis method(s)</td><td style=\"border: 1px solid #ccc; padding: 8px;\">Name of the analysis method(s), technique(s), or assay(s) used to measure bioavailability, as specified in the source the data was collected from</td></tr>
@@ -923,20 +1024,20 @@ fluidRow(style = "background-color: #dedede;padding-left: 20px;border: 0.5px sol
          )),
 fluidRow(
   style = "background-color: #F6F6F6;padding-left: 20px;padding-bottom: 20px; padding-top: 20px;border-left: 0.5px solid #bdbdbd;border-right: 0.5px solid #bdbdbd;border-bottom: 0.5px solid #bdbdbd;",
-  column(
-    2,
-    virtualSelectInput(
-      inputId = "model",
-      label = "Model:",
-      choices = c("in vivo", "in vitro"),
-      selected = c(unique(as.character(
-        Protein_Correction$Model
-      ))),
-      multiple = TRUE,
-      showValueAsTags = TRUE,
-      width = '100%'
-    )
-  ),
+  # column(
+  #   2,
+  #   virtualSelectInput(
+  #     inputId = "model",
+  #     label = "Model:",
+  #     choices = c("in vivo", "in vitro"),
+  #     selected = c(unique(as.character(
+  #       Protein_Correction$Model
+  #     ))),
+  #     multiple = TRUE,
+  #     showValueAsTags = TRUE,
+  #     width = '100%'
+  #   )
+  # ),
   column(
     2,
     virtualSelectInput(
@@ -968,7 +1069,7 @@ fluidRow(
     )
   ),
   column(
-    4,
+    6,
     virtualSelectInput(
       inputId = "analyte",
       label = "Protein Form:",
@@ -1171,7 +1272,13 @@ server <- function(input, output, session) {
       inputId = "pq_sample",
       label = "Sample Location",
       choices = c("fecal", "ileal"),
-      selected = if ("PDCAAS" %in% input$score) c("fecal", "ileal") else c("ileal")
+      selected = if (identical(input$score, "PDCAAS")) {
+        "fecal"
+      } else if (identical(input$score, "DIAAS")) {
+        "ileal"
+      } else {
+        c("fecal", "ileal")
+      }
     )
   })
 
@@ -1425,6 +1532,7 @@ server <- function(input, output, session) {
         }
         if (input$require_bioavail == TRUE) {
           EAA_composition <- EAA_composition %>%
+            filter(NI_ID != "NA") %>%
             drop_na(NI_ID)
         }
 
@@ -1447,7 +1555,6 @@ server <- function(input, output, session) {
             mutate(portion = paste0(input$serving_weight, " g"))
         }
 
-
         if (input$EAA_rec == "Choose custom recommendations") {
           pattern <- scoring_pattern %>%
             filter(`Pattern Name` == input$EAA_rec) %>%
@@ -1460,8 +1567,8 @@ server <- function(input, output, session) {
             select(AA = Analyte, Amount)
         }
 
-
-        EAA_9 <- EAA_9 %>%
+        # Original logic
+        EAA_9_og <- EAA_9 %>%
           left_join(pattern, by = "AA") %>%
           mutate(
             norm_value = Amount * input$weight,
@@ -1481,22 +1588,22 @@ server <- function(input, output, session) {
             `Food Composition Ref`
           )
 
-        min_scores <- EAA_9 %>%
-          group_by(fdcId, NI_ID, `food description`) %>%
+        min_scores <- EAA_9_og %>%
+          group_by(fdcId, `food identifier`, `food description`) %>%
           summarise(
             calculation = paste0(
               "min(",
               str_c(calculation, collapse = ", "),
               ") x 100 x Correction Factor \n = ",
-              min(round(value, 4)),
+              min(round(value, 2)),
               " x 100 x Correction Factor"
             ),
             .groups = "drop"
           )
 
-        EAA_9 <- EAA_9 %>%
+        EAA_9_og <- EAA_9_og %>%
           select(-calculation) %>%
-          left_join(min_scores, by = c("fdcId", "NI_ID", "food description")) %>%
+          left_join(min_scores, by = c("fdcId", "food identifier", "food description")) %>%
           group_by(
             fdcId,
             `food identifier`,
@@ -1523,8 +1630,9 @@ server <- function(input, output, session) {
                 `Data Collection Source`
               ) %>%
               summarise(
-                `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
-                NI_ID = paste(NI_ID, collapse = "; "),
+                `Correction Factor  (%)` = round(sum(`Correction Factor  (%)`, na.rm = TRUE) /
+                                                   n(), 2),
+                NI_ID = paste0(NI_ID, collapse = "; "),
                 .groups = "drop"
               ) %>%
               separate_longer_delim(NI_ID, delim = "; ") %>%
@@ -1583,19 +1691,7 @@ server <- function(input, output, session) {
           filter(
             ifelse(
               !is.na(`Protein Form`),
-              `Protein Form` == "crude protein" |
-                `Limiting AA` == `Protein Form` |
-                (
-                  `Limiting AA` == "methionine+cysteine" &
-                    `Protein Form` == "methionine"
-                ) |
-                (
-                  `Limiting AA` == "phenylalanine+tyrosine" &
-                    `Protein Form` == "phenylalanine"
-                ) |
-                (
-                  `Limiting AA` == "lysine" & `Protein Form` == "reactive lysine"
-                ),
+              `Protein Form` == "crude protein" ,
               !is.na(`EAA-9`)
             )
           ) %>%
@@ -1630,12 +1726,179 @@ server <- function(input, output, session) {
           ) %>%
           distinct()
 
+        #Altered logic for aa
+        # --- AA digestibility lookups (AA-specific) ---
+        aa_cf <- Protein_Correction %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          # Average CF at the Food/Species/... level and collect the NI_IDs that contributed
+          dplyr::group_by(
+            Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          # Re-expand NI_ID for matching by NI_ID later (still a single NI_ID column)
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # Keep only NI_ID + crude-protein CF for optional fallbacks/extensions
+        cp_cf <- aa_cf %>%
+          dplyr::filter(`Protein Form` == "crude protein") %>%
+          dplyr::select(NI_ID, cp_cf = cf)
+
+        # Map AA label -> Protein Form used in correction table
+        map_pf <- function(aa) dplyr::case_when(
+          aa == "lysine" ~ "reactive lysine",
+          aa == "methionine+cysteine" ~ "methionine",
+          aa == "phenylalanine+tyrosine" ~ "phenylalanine",
+          TRUE ~ aa
+        )
+
+        # --- Per-AA rows with digestibility applied BEFORE min() ---
+        EAA_9_alt_rows <- EAA_9 %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg = (value)) %>%         # mg AA (already per your input)
+          dplyr::left_join(pattern, by = "AA") %>%
+          dplyr::mutate(Amount = Amount * input$weight) %>%
+          dplyr::mutate(`Protein Form Join` = map_pf(AA)) %>%
+          # Bring AA-specific CF + metadata; align Protein Form strings for join
+          dplyr::left_join(
+            aa_cf %>%
+              dplyr::select(
+                NI_ID, `Protein Form`, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ) %>%
+              dplyr::mutate(`Protein Form` = map_pf(`Protein Form`)),
+            by = c("NI_ID", "Protein Form Join" = "Protein Form")
+          ) %>%
+          # Keep only rows where AA-specific digestibility exists (no crude fallback here)
+          dplyr::filter(!is.na(cf)) %>%
+          dplyr::mutate(dig = cf) %>%
+          dplyr::mutate(value = (aa_mg * dig) / Amount) %>%  # ratio (not %)
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg, format = "f", digits = 2),
+              formatC(dig,    format = "f", digits = 3),
+              Amount
+            )
+          ) %>%
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`,
+            AA, Amount, aa_mg, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Protein Form Join`, portion
+          )
+
+        # --- Build full calculation string (no "Correction Factor" text) ---
+        temp_2 <- EAA_9_alt_rows %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, Species, `food description`,
+            `Sample Location`, Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            min_val = min(value, na.rm = TRUE),
+            calculation = paste0(
+              "min(",
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") x 100 = ",
+              formatC(min_val, format = "f", digits = 4),
+              " x 100 = ",
+              formatC(min_val * 100, format = "f", digits = 2),
+              "%"
+            ),
+            n_rows = dplyr::n(),
+            .groups = "drop"
+          )
+
+        # --- Limiting AA and final table (EAA-9 stored as ratio; display shows %) ---
+        EAA_9_alt <- EAA_9_alt_rows %>%
+          dplyr::group_by(
+            fdcId, NI_ID, `food identifier`, `food description`, `Food Composition Ref`
+          ) %>%
+          dplyr::mutate(`EAA-9 (%)` = min(value, na.rm = TRUE)) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(value == `EAA-9 (%)`) %>%
+          dplyr::left_join(
+            temp_2,
+            by = c(
+              "fdcId", "food identifier", "food description",
+              "Species", "Sample Location", "Calculation", "Data Collection Source"
+            )
+          ) %>%
+          dplyr::filter(value == min_val) %>%
+          dplyr::mutate(`EAA-9 (%)` = min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(
+            indicator = dplyr::case_when(
+              `Data Collection Source` == `Food Composition Ref` ~ 1L,
+              stringr::str_detect(`Food Composition Ref`, "Standard Reference") ~ 2L,
+              TRUE ~ 3L
+            )
+          ) %>%
+          dplyr::filter(!(Calculation == "metabolic availability" &
+                            !stringr::str_detect(`Food Composition Ref`, "Standard Reference"))) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(
+            min_indicator = ifelse(
+              `Data Collection Source` == "Not Available",
+              2L, min(indicator, na.rm = TRUE)
+            )
+          ) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator) %>%
+          dplyr::select(!min_indicator) %>%
+          # --- Rebuild Food label and RE-CONCATENATE NI_ID like the first half ---
+          dplyr::mutate(Food = dplyr::coalesce(Food, `food description`)) %>%
+          dplyr::group_by(
+            Food, Species, `Protein Form Join`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::mutate(NI_ID = paste0(unique(NI_ID), collapse = "; ")) %>%
+          dplyr::distinct() %>%
+          dplyr::ungroup() %>%
+          dplyr::transmute(
+            NI_ID,
+            Food,
+            Species,
+            `Sample Location`,
+            `Protein Form` = `Protein Form Join`,
+            Calculation,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
+            fdcId,
+            portion,
+            `EAA-9 (%)` = round(`EAA-9 (%)`, 2) * 100,
+            calculation,
+            `Food Composition Ref`,
+            `Data Collection Source`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::rename("serving size" = "portion") %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+
+
+        EAA_9 <- dplyr::bind_rows(
+          EAA_9_og  %>% mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`)),
+          EAA_9_alt %>% mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+        )
+
+
         # Optional: final score/calc switch
         if (input$show_calc == "score_only") {
           EAA_9 <- EAA_9 %>% select(-calculation)
         } else {
-          EAA_9 <-
-            EAA_9 %>% select(-`EAA-9 (%)`) %>% rename("EAA-9 (%)" = "calculation")
+          EAA_9 <- EAA_9 %>% select(-`EAA-9 (%)`) %>% rename("EAA-9 (%)" = "calculation")
         }
 
         if (length(input$score) != 1) {
@@ -1643,8 +1906,6 @@ server <- function(input, output, session) {
         } else {
           PQ_df <- EAA_9
         }
-
-
       }
 
       if (ifelse(length(input$score) != 1,
@@ -1709,6 +1970,7 @@ server <- function(input, output, session) {
           group_by(fdcId,
                    NI_ID,
                    `food description`,
+                   `food identifier`,
                    Protein,
                    `Food Composition Ref`) %>%
           mutate(PDCAAS = min(value)) %>%
@@ -1742,7 +2004,7 @@ server <- function(input, output, session) {
                 Calculation,
                 `Data Collection Source`
               ) %>%
-              filter(`Sample Location` == "ileal") %>%
+              filter(`Sample Location` == "fecal") %>%
               mutate(Food = str_remove(Food, ", Average")) %>%
               group_by(
                 Food,
@@ -1774,7 +2036,12 @@ server <- function(input, output, session) {
             Calculation == "metabolic availability" &
               !str_detect(`Food Composition Ref`, "Standard Reference")
           )) %>%
-          group_by(`food identifier`) %>%
+          group_by(`food identifier`,
+                   fdcId,
+                   Species,
+                   `Protein Form`,
+                   `Sample Location`,
+                   Calculation) %>%
           mutate(min_indicator = ifelse(
             `Data Collection Source` == "Not Available",
             2,
@@ -1864,225 +2131,332 @@ server <- function(input, output, session) {
 
       }
 
-
       if (ifelse(length(input$score) != 1,
                  "DIAAS" %in% input$score,
                  "DIAAS" == input$score)) {
-        DIAAS <- EAA_composition %>%
-          drop_na(Protein) %>%
-          drop_na(NI_ID) %>%
-          mutate(value = (value) / Protein) %>%
-          mutate(value = value * 1000) %>%
-          left_join(
-            scoring_pattern %>%
-              rename("AA" = "Analyte") %>%
-              filter(`Pattern Name` == input$EAA_rec_DIAAS) %>%
-              filter(Age == input$rec_age_DIAAS) %>%
-              select(AA, Amount)
+
+        # --- AA-specific digestibility lookups (keep BOTH lysine + reactive lysine) ---
+        aa_cf <- Protein_Correction %>%
+          dplyr::filter(`Protein Form` %in% c(
+            "histidine","leucine","isoleucine","valine",
+            "tryptophan","lysine","reactive lysine",
+            "methionine","threonine","phenylalanine"
+          )) %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          # DO NOT drop plain lysine when reactive is present — we need both
+          dplyr::select(
+            NI_ID, Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`, `Correction Factor  (%)`
           ) %>%
-          mutate(calculation = paste0(round(value, 2), "/", Amount)) %>%
-          mutate(value = value / Amount) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            value,
-            AA,
-            calculation,
-            `Food Composition Ref`
+          dplyr::distinct() %>%
+          # Average CF at the Food/Species/Protein Form/... level and carry NI_IDs
+          dplyr::group_by(
+            Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          # Re-expand NI_ID for joining by NI_ID later
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # --- Crude protein digestibility lookup (unchanged) ---
+        cp_cf <- Protein_Correction %>%
+          dplyr::filter(`Protein Form` == "crude protein") %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          dplyr::select(
+            NI_ID, Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`, `Correction Factor  (%)`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # Map AA label -> Protein Form used in correction table
+        # (Do NOT map lysine => reactive lysine here; we handle that via 'variant' below)
+        map_pf <- function(aa) dplyr::case_when(
+          aa == "methionine+cysteine" ~ "methionine",
+          aa == "phenylalanine+tyrosine" ~ "phenylalanine",
+          TRUE ~ aa
+        )
+
+        # --- Per-AA rows with digestibility applied BEFORE min()
+        # Duplicate the rows across two variants so we compute BOTH versions:
+        #  - variant = "lysine = reactive"  -> use reactive lysine CF for AA == "lysine"
+        #  - variant = "lysine = plain"     -> use plain lysine CF for AA == "lysine"
+        DIAAS_rows <- EAA_composition %>%
+          dplyr::filter(NI_ID != "Not Available", NI_ID != "NA") %>%
+          tidyr::drop_na(Protein, NI_ID) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg_per_g = (value / Protein) * 1000) %>%
+          dplyr::left_join(
+            scoring_pattern %>%
+              dplyr::rename(AA = Analyte) %>%
+              dplyr::filter(`Pattern Name` == input$EAA_rec_DIAAS,
+                            Age == input$rec_age_DIAAS) %>%
+              dplyr::select(AA, Amount),
+            by = "AA"
+          ) %>%
+          # Cross with the two lysine variants
+          tidyr::crossing(variant = c("lysine = reactive", "lysine = plain")) %>%
+          dplyr::mutate(
+            `Protein Form Join` = dplyr::case_when(
+              AA == "lysine" & variant == "lysine = reactive" ~ "reactive lysine",
+              AA == "lysine" & variant == "lysine = plain"    ~ "lysine",
+              TRUE ~ map_pf(AA)
+            )
+          ) %>%
+          # Bring AA-specific digestibility with NI_ID re-expanded
+          dplyr::left_join(
+            aa_cf %>%
+              dplyr::select(
+                NI_ID, `Protein Form`, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ),
+            by = c("NI_ID", "Protein Form Join" = "Protein Form")
+          ) %>%
+          dplyr::mutate(dig = cf) %>%
+          # numeric DIAAS term per AA (ratio). NA if dig is missing.
+          dplyr::mutate(value = (aa_mg_per_g * dig) / Amount) %>%
+          # full numeric term string (showing which digestibility was used)
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg_per_g, format = "f", digits = 2),
+              formatC(dig,        format = "f", digits = 3),
+              Amount
+            )
+          ) %>%
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`, Protein,
+            AA, Amount, aa_mg_per_g, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Protein Form Join`, variant
           )
 
-        temp_2 <- DIAAS %>%
-          select(fdcId, NI_ID, `food description`, value, calculation) %>%
-          group_by(fdcId, NI_ID, `food description`) %>%
-          summarise(
+        # --- Build full calculation string for AA-specific (include fdcId + description + variant) ---
+        temp_2 <- DIAAS_rows %>%
+          dplyr::select(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            AA, value, calc_piece, dig, variant
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            variant
+          ) %>%
+          dplyr::summarise(
+            min_val = { vv <- value; if (all(is.na(vv))) NA_real_ else min(vv, na.rm = TRUE) },
             calculation = paste0(
               "min(",
-              str_c(calculation, collapse = ", "),
-              ", 1) x Correction Factor \n = ",
-              paste0(ifelse(min(
-                round(value, 2)
-              ) >= 1, 1, min(
-                round(value, 2)
-              ))),
-              " x Correction Factor"
-            )
-          ) %>%
-          ungroup()
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") = ",
+              formatC(min_val, format = "f", digits = 4)
+            ),
+            n_rows = dplyr::n_distinct(AA[!is.na(dig) & !is.na(value)]),
+            .groups = "drop"
+          )
 
-        DIAAS <- DIAAS %>%
-          select(!calculation) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            value,
-            AA,
-            `Food Composition Ref`
-          ) %>%
-          group_by(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            `Food Composition Ref`
-          ) %>%
-          mutate(DIAAS = min(value)) %>%
-          filter(value == DIAAS) %>%
-          ungroup() %>%
-          left_join(temp_2) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            AA,
-            DIAAS,
-            calculation,
-            `Food Composition Ref`
-          ) %>%
-          rename("Limiting AA" = "AA") %>%
-          separate_longer_delim(NI_ID, delim = ";") %>%
-          mutate(NI_ID = str_trim(NI_ID)) %>%
-          left_join(
-            Protein_Correction %>%
-              select(
-                NI_ID,
-                Food,
-                `Correction Factor  (%)`,
-                Species,
-                `Protein Form`,
-                `Sample Location`,
-                Calculation,
-                `Data Collection Source`
-              ) %>%
-              filter(`Sample Location` == "ileal") %>%
-              mutate(Food = str_remove(Food, ", Average")) %>%
-              group_by(
-                Food,
-                Species,
-                `Protein Form`,
-                `Sample Location`,
-                Calculation,
-                `Data Collection Source`
-              ) %>%
-              summarise(
-                `Correction Factor  (%)` = round(sum(`Correction Factor  (%)`, na.rm = TRUE) /
-                                                   n(), 2),
-                NI_ID = paste0(NI_ID, collapse = "; ")
-              ) %>%
-              separate_longer_delim(NI_ID, delim = "; ") %>%
-              distinct()
-          ) %>%
-          replace_na(list("Data Collection Source" = "Not Available")) %>%
-          mutate(indicator = ifelse(
-            `Data Collection Source` == `Food Composition Ref`,
-            1,
-            ifelse(
-              str_detect(`Food Composition Ref`, "Standard Reference"),
-              2,
-              3
+        # --- Limiting AA and final table for AA-specific (two rows per item: one per variant) ---
+        DIAAS_aa <- DIAAS_rows %>%
+          dplyr::left_join(
+            temp_2,
+            by = c(
+              "fdcId","food identifier","food description","Species",
+              "Sample Location","Calculation","Data Collection Source",
+              "Food Composition Ref","variant"
             )
-          )) %>%
-          filter(!(
-            Calculation == "metabolic availability" &
-              !str_detect(`Food Composition Ref`, "Standard Reference")
-          )) %>%
-          group_by(`food identifier`) %>%
-          mutate(min_indicator = ifelse(
-            `Data Collection Source` == "Not Available",
-            2,
-            min(indicator, na.rm = TRUE)
-          )) %>%
-          ungroup() %>%
-          filter(indicator == min_indicator) %>%
-          select(!indicator) %>%
-          select(!min_indicator) %>%
-          mutate(Food = ifelse(is.na(Food), `food description`, Food)) %>%
-          group_by(
-            Food,
-            Species,
-            `Protein Form`,
-            `Sample Location`,
-            Calculation,
-            `Data Collection Source`
           ) %>%
-          mutate(NI_ID = paste0(NI_ID, collapse = "; ")) %>%
-          distinct() %>%
-          mutate(DIAAS = DIAAS * ifelse(!is.na(`Correction Factor  (%)`), (
-            as.numeric(`Correction Factor  (%)`) / 100
-          ), 1)) %>%
-          filter(
-            `Protein Form` == "crude protein" |
-              `Limiting AA` == `Protein Form` |
-              (
-                `Limiting AA` == "methionine+cysteine" &
-                  `Protein Form` == "methionine"
-              ) |
-              (
-                `Limiting AA` == "phenylalanine+tyrosine" &
-                  `Protein Form` == "phenylalanine"
-              ) | (
-                `Limiting AA` == "lysine" & `Protein Form` == "reactive lysine"
-              )
+          dplyr::mutate(DIAAS = min_val) %>%
+          dplyr::filter(value == min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(indicator = dplyr::if_else(
+            `Data Collection Source` == `Food Composition Ref`, 1L,
+            dplyr::if_else(stringr::str_detect(`Food Composition Ref`, "Standard Reference"), 2L, 3L)
+          )) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(min_indicator = ifelse(
+            `Data Collection Source` == "Not Available", 2L, min(indicator, na.rm = TRUE)
+          )) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator, !min_indicator) %>%
+          # Rebuild Food label and re-concatenate NI_IDs within the row grouping (per variant)
+          dplyr::mutate(Food = dplyr::coalesce(Food, `food description`)) %>%
+          dplyr::group_by(
+            Food, Species, `Protein Form Join`, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Food Composition Ref`, fdcId, AA, variant
           ) %>%
-          mutate(DIAAS = round(DIAAS, 4)) %>%
-          mutate(calculation = paste0(calculation, " \n = ", DIAAS)) %>%
-          select(
+          dplyr::mutate(NI_ID = paste0(unique(NI_ID), collapse = "; ")) %>%
+          dplyr::ungroup() %>%
+          dplyr::distinct() %>%
+          dplyr::transmute(
             NI_ID,
             Food,
-            Species,
-            `Sample Location`,
-            `Protein Form`,
+            Species, `Sample Location`,
+            `Protein Form` = `Protein Form Join`,
             Calculation,
-            `Correction Factor  (%)`,
-            `Limiting AA`,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
             fdcId,
-            DIAAS,
+            # `Lysine Variant` = variant,   # <— tells you which lysine CF was used
+            DIAAS = round(DIAAS, 2),
             calculation,
             `Food Composition Ref`,
             `Data Collection Source`
           ) %>%
-          distinct() %>%
-          mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`)) %>%
-          replace_na(
-            list(
-              Calculation = "Not Available",
-              `Sample Location` = "Not Available",
-              `Protein Form` = "Not Available",
-              Species = "Not Available",
-              `Correction Factor  (%)` = "Not Available",
-              `Data Collection Source` = "Not Available"
+          dplyr::distinct() %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+
+        # --- Crude protein branch (unchanged) ---
+        DIAAS_cp_rows <- EAA_composition %>%
+          tidyr::drop_na(Protein, NI_ID) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg_per_g = (value / Protein) * 1000) %>%
+          dplyr::left_join(
+            scoring_pattern %>%
+              dplyr::rename(AA = Analyte) %>%
+              dplyr::filter(`Pattern Name` == input$EAA_rec_DIAAS,
+                            Age == input$rec_age_DIAAS) %>%
+              dplyr::select(AA, Amount),
+            by = "AA"
+          ) %>%
+          dplyr::left_join(
+            cp_cf %>%
+              dplyr::select(
+                NI_ID, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ),
+            by = "NI_ID"
+          ) %>%
+          dplyr::filter(!is.na(cf)) %>%
+          dplyr::mutate(dig = cf) %>%
+          dplyr::mutate(value = (aa_mg_per_g * dig) / Amount) %>%
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg_per_g, format = "f", digits = 2),
+              formatC(dig, format = "f", digits = 3),
+              Amount
             )
           ) %>%
-          distinct()
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`, Protein,
+            AA, Amount, aa_mg_per_g, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`
+          )
 
+        temp_3 <- DIAAS_cp_rows %>%
+          dplyr::select(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            AA, value, calc_piece, dig
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`
+          ) %>%
+          dplyr::summarise(
+            min_val = { vv <- value; if (all(is.na(vv))) NA_real_ else min(vv, na.rm = TRUE) },
+            calculation = paste0(
+              "min(",
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") = ",
+              formatC(min_val, format = "f", digits = 4)
+            ),
+            .groups = "drop"
+          )
 
-        rm(temp_2)
+        DIAAS_cp <- DIAAS_cp_rows %>%
+          dplyr::left_join(
+            temp_3,
+            by = c(
+              "fdcId","food identifier","food description","Species",
+              "Sample Location","Calculation","Data Collection Source",
+              "Food Composition Ref"
+            )
+          ) %>%
+          dplyr::mutate(DIAAS = min_val) %>%
+          dplyr::filter(value == min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(indicator = dplyr::if_else(
+            `Data Collection Source` == `Food Composition Ref`, 1L,
+            dplyr::if_else(stringr::str_detect(`Food Composition Ref`, "Standard Reference"), 2L, 3L)
+          )) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(min_indicator = ifelse(
+            `Data Collection Source` == "Not Available", 2L, min(indicator, na.rm = TRUE)
+          )) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator, !min_indicator) %>%
+          dplyr::transmute(
+            NI_ID,
+            Food = dplyr::coalesce(Food, `food description`),
+            Species, `Sample Location`,
+            `Protein Form` = "crude protein",
+            Calculation,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
+            fdcId,
+            # `Lysine Variant` = NA_character_,  # not applicable in CP branch
+            DIAAS = round(DIAAS, 2),
+            calculation,
+            `Food Composition Ref`,
+            `Data Collection Source`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
 
+        # --- Combine both approaches (AA-specific has two variants per item) ---
+        DIAAS <- dplyr::bind_rows(DIAAS_aa, DIAAS_cp)
+
+        # --- Output toggle ---
         if (input$show_calc == "score_only") {
-          DIAAS <- DIAAS %>%
-            select(!calculation)
-        } else{
-          DIAAS <- DIAAS %>%
-            select(!DIAAS) %>%
-            rename("DIAAS" = "calculation")
+          DIAAS <- DIAAS %>% dplyr::select(-calculation)
+        } else {
+          DIAAS <- DIAAS %>% dplyr::select(-DIAAS) %>% dplyr::rename("DIAAS" = "calculation")
         }
 
         if (length(input$score) != 1) {
-          PQ_df <- full_join(PQ_df, DIAAS)
-        } else{
+          PQ_df <- dplyr::full_join(PQ_df, DIAAS)
+        } else {
           PQ_df <- DIAAS
         }
-
-
       }
+
 
       if ("crude protein" %in% debounced_filters()$analyte) {
         if (!("individual amino acids" %in% debounced_filters()$analyte)) {
@@ -2151,6 +2525,8 @@ server <- function(input, output, session) {
 
       }
     }
+    PQ_df
+
   })
   data_bv <- reactive({
     correction_factors <- Protein_Correction
@@ -2174,7 +2550,6 @@ server <- function(input, output, session) {
         )
       ) %>%
       filter(`Species` %in% input$species) %>%
-      filter(`Model` %in% input$model) %>%
       filter(`Sample Location` %in% input$sample) %>%
       filter(`Protein Form` %in% input$analyte) %>%
       filter(Calculation %in% input$measure)
@@ -2272,7 +2647,7 @@ server <- function(input, output, session) {
         pageLength = 25,
         lengthMenu = c(25, 50, 75, 100),
         columnDefs = list(list(
-          targets = c(12, 13),
+          targets = c(11, 12),
           render = JS(
             "function(data, type, row, meta) {",
             "return type === 'display' && data.length > 100 ?",
@@ -2283,10 +2658,10 @@ server <- function(input, output, session) {
       ),
       escape = FALSE
     ) %>%
-      formatStyle(1:14,
+      formatStyle(1:13,
                   'vertical-align' = 'top',
                   'overflow-wrap' = 'break-word') %>%
-      formatStyle(12:13,
+      formatStyle(11:12,
                   'overflow-wrap' = 'break-word',
                   'word-break' = 'break-word')
 
@@ -2407,6 +2782,7 @@ server <- function(input, output, session) {
         }
         if (input$require_bioavail == TRUE) {
           EAA_composition <- EAA_composition %>%
+            filter(NI_ID != "NA") %>%
             drop_na(NI_ID)
         }
 
@@ -2429,7 +2805,6 @@ server <- function(input, output, session) {
             mutate(portion = paste0(input$serving_weight, " g"))
         }
 
-
         if (input$EAA_rec == "Choose custom recommendations") {
           pattern <- scoring_pattern %>%
             filter(`Pattern Name` == input$EAA_rec) %>%
@@ -2442,8 +2817,8 @@ server <- function(input, output, session) {
             select(AA = Analyte, Amount)
         }
 
-
-        EAA_9 <- EAA_9 %>%
+        # Original logic
+        EAA_9_og <- EAA_9 %>%
           left_join(pattern, by = "AA") %>%
           mutate(
             norm_value = Amount * input$weight,
@@ -2463,22 +2838,22 @@ server <- function(input, output, session) {
             `Food Composition Ref`
           )
 
-        min_scores <- EAA_9 %>%
-          group_by(fdcId, NI_ID, `food description`) %>%
+        min_scores <- EAA_9_og %>%
+          group_by(fdcId, `food identifier`, `food description`) %>%
           summarise(
             calculation = paste0(
               "min(",
               str_c(calculation, collapse = ", "),
               ") x 100 x Correction Factor \n = ",
-              min(round(value, 4)),
+              min(round(value, 2)),
               " x 100 x Correction Factor"
             ),
             .groups = "drop"
           )
 
-        EAA_9 <- EAA_9 %>%
+        EAA_9_og <- EAA_9_og %>%
           select(-calculation) %>%
-          left_join(min_scores, by = c("fdcId", "NI_ID", "food description")) %>%
+          left_join(min_scores, by = c("fdcId", "food identifier", "food description")) %>%
           group_by(
             fdcId,
             `food identifier`,
@@ -2505,8 +2880,9 @@ server <- function(input, output, session) {
                 `Data Collection Source`
               ) %>%
               summarise(
-                `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
-                NI_ID = paste(NI_ID, collapse = "; "),
+                `Correction Factor  (%)` = round(sum(`Correction Factor  (%)`, na.rm = TRUE) /
+                                                   n(), 2),
+                NI_ID = paste0(NI_ID, collapse = "; "),
                 .groups = "drop"
               ) %>%
               separate_longer_delim(NI_ID, delim = "; ") %>%
@@ -2565,19 +2941,7 @@ server <- function(input, output, session) {
           filter(
             ifelse(
               !is.na(`Protein Form`),
-              `Protein Form` == "crude protein" |
-                `Limiting AA` == `Protein Form` |
-                (
-                  `Limiting AA` == "methionine+cysteine" &
-                    `Protein Form` == "methionine"
-                ) |
-                (
-                  `Limiting AA` == "phenylalanine+tyrosine" &
-                    `Protein Form` == "phenylalanine"
-                ) |
-                (
-                  `Limiting AA` == "lysine" & `Protein Form` == "reactive lysine"
-                ),
+              `Protein Form` == "crude protein" ,
               !is.na(`EAA-9`)
             )
           ) %>%
@@ -2612,12 +2976,179 @@ server <- function(input, output, session) {
           ) %>%
           distinct()
 
+        #Altered logic for aa
+        # --- AA digestibility lookups (AA-specific) ---
+        aa_cf <- Protein_Correction %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          # Average CF at the Food/Species/... level and collect the NI_IDs that contributed
+          dplyr::group_by(
+            Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          # Re-expand NI_ID for matching by NI_ID later (still a single NI_ID column)
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # Keep only NI_ID + crude-protein CF for optional fallbacks/extensions
+        cp_cf <- aa_cf %>%
+          dplyr::filter(`Protein Form` == "crude protein") %>%
+          dplyr::select(NI_ID, cp_cf = cf)
+
+        # Map AA label -> Protein Form used in correction table
+        map_pf <- function(aa) dplyr::case_when(
+          aa == "lysine" ~ "reactive lysine",
+          aa == "methionine+cysteine" ~ "methionine",
+          aa == "phenylalanine+tyrosine" ~ "phenylalanine",
+          TRUE ~ aa
+        )
+
+        # --- Per-AA rows with digestibility applied BEFORE min() ---
+        EAA_9_alt_rows <- EAA_9 %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg = (value)) %>%         # mg AA (already per your input)
+          dplyr::left_join(pattern, by = "AA") %>%
+          dplyr::mutate(Amount = Amount * input$weight) %>%
+          dplyr::mutate(`Protein Form Join` = map_pf(AA)) %>%
+          # Bring AA-specific CF + metadata; align Protein Form strings for join
+          dplyr::left_join(
+            aa_cf %>%
+              dplyr::select(
+                NI_ID, `Protein Form`, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ) %>%
+              dplyr::mutate(`Protein Form` = map_pf(`Protein Form`)),
+            by = c("NI_ID", "Protein Form Join" = "Protein Form")
+          ) %>%
+          # Keep only rows where AA-specific digestibility exists (no crude fallback here)
+          dplyr::filter(!is.na(cf)) %>%
+          dplyr::mutate(dig = cf) %>%
+          dplyr::mutate(value = (aa_mg * dig) / Amount) %>%  # ratio (not %)
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg, format = "f", digits = 2),
+              formatC(dig,    format = "f", digits = 3),
+              Amount
+            )
+          ) %>%
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`,
+            AA, Amount, aa_mg, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Protein Form Join`, portion
+          )
+
+        # --- Build full calculation string (no "Correction Factor" text) ---
+        temp_2 <- EAA_9_alt_rows %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, Species, `food description`,
+            `Sample Location`, Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            min_val = min(value, na.rm = TRUE),
+            calculation = paste0(
+              "min(",
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") x 100 = ",
+              formatC(min_val, format = "f", digits = 4),
+              " x 100 = ",
+              formatC(min_val * 100, format = "f", digits = 2),
+              "%"
+            ),
+            n_rows = dplyr::n(),
+            .groups = "drop"
+          )
+
+        # --- Limiting AA and final table (EAA-9 stored as ratio; display shows %) ---
+        EAA_9_alt <- EAA_9_alt_rows %>%
+          dplyr::group_by(
+            fdcId, NI_ID, `food identifier`, `food description`, `Food Composition Ref`
+          ) %>%
+          dplyr::mutate(`EAA-9 (%)` = min(value, na.rm = TRUE)) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(value == `EAA-9 (%)`) %>%
+          dplyr::left_join(
+            temp_2,
+            by = c(
+              "fdcId", "food identifier", "food description",
+              "Species", "Sample Location", "Calculation", "Data Collection Source"
+            )
+          ) %>%
+          dplyr::filter(value == min_val) %>%
+          dplyr::mutate(`EAA-9 (%)` = min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(
+            indicator = dplyr::case_when(
+              `Data Collection Source` == `Food Composition Ref` ~ 1L,
+              stringr::str_detect(`Food Composition Ref`, "Standard Reference") ~ 2L,
+              TRUE ~ 3L
+            )
+          ) %>%
+          dplyr::filter(!(Calculation == "metabolic availability" &
+                            !stringr::str_detect(`Food Composition Ref`, "Standard Reference"))) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(
+            min_indicator = ifelse(
+              `Data Collection Source` == "Not Available",
+              2L, min(indicator, na.rm = TRUE)
+            )
+          ) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator) %>%
+          dplyr::select(!min_indicator) %>%
+          # --- Rebuild Food label and RE-CONCATENATE NI_ID like the first half ---
+          dplyr::mutate(Food = dplyr::coalesce(Food, `food description`)) %>%
+          dplyr::group_by(
+            Food, Species, `Protein Form Join`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::mutate(NI_ID = paste0(unique(NI_ID), collapse = "; ")) %>%
+          dplyr::distinct() %>%
+          dplyr::ungroup() %>%
+          dplyr::transmute(
+            NI_ID,
+            Food,
+            Species,
+            `Sample Location`,
+            `Protein Form` = `Protein Form Join`,
+            Calculation,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
+            fdcId,
+            portion,
+            `EAA-9 (%)` = round(`EAA-9 (%)`, 2) * 100,
+            calculation,
+            `Food Composition Ref`,
+            `Data Collection Source`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::rename("serving size" = "portion") %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+
+
+        EAA_9 <- dplyr::bind_rows(
+          EAA_9_og  %>% mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`)),
+          EAA_9_alt %>% mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+        )
+
+
         # Optional: final score/calc switch
         if (input$show_calc == "score_only") {
           EAA_9 <- EAA_9 %>% select(-calculation)
         } else {
-          EAA_9 <-
-            EAA_9 %>% select(-`EAA-9 (%)`) %>% rename("EAA-9 (%)" = "calculation")
+          EAA_9 <- EAA_9 %>% select(-`EAA-9 (%)`) %>% rename("EAA-9 (%)" = "calculation")
         }
 
         if (length(input$score) != 1) {
@@ -2625,8 +3156,6 @@ server <- function(input, output, session) {
         } else {
           PQ_df <- EAA_9
         }
-
-
       }
 
       if (ifelse(length(input$score) != 1,
@@ -2691,6 +3220,7 @@ server <- function(input, output, session) {
           group_by(fdcId,
                    NI_ID,
                    `food description`,
+                   `food identifier`,
                    Protein,
                    `Food Composition Ref`) %>%
           mutate(PDCAAS = min(value)) %>%
@@ -2724,7 +3254,7 @@ server <- function(input, output, session) {
                 Calculation,
                 `Data Collection Source`
               ) %>%
-              filter(`Sample Location` == "ileal") %>%
+              filter(`Sample Location` == "fecal") %>%
               mutate(Food = str_remove(Food, ", Average")) %>%
               group_by(
                 Food,
@@ -2756,7 +3286,12 @@ server <- function(input, output, session) {
             Calculation == "metabolic availability" &
               !str_detect(`Food Composition Ref`, "Standard Reference")
           )) %>%
-          group_by(`food identifier`) %>%
+          group_by(`food identifier`,
+                   fdcId,
+                   Species,
+                   `Protein Form`,
+                   `Sample Location`,
+                   Calculation) %>%
           mutate(min_indicator = ifelse(
             `Data Collection Source` == "Not Available",
             2,
@@ -2846,225 +3381,337 @@ server <- function(input, output, session) {
 
       }
 
-
       if (ifelse(length(input$score) != 1,
                  "DIAAS" %in% input$score,
                  "DIAAS" == input$score)) {
-        DIAAS <- EAA_composition %>%
-          drop_na(Protein) %>%
-          drop_na(NI_ID) %>%
-          mutate(value = (value) / Protein) %>%
-          mutate(value = value * 1000) %>%
-          left_join(
-            scoring_pattern %>%
-              rename("AA" = "Analyte") %>%
-              filter(`Pattern Name` == input$EAA_rec_DIAAS) %>%
-              filter(Age == input$rec_age_DIAAS) %>%
-              select(AA, Amount)
+
+        # --- AA-specific digestibility lookups (keep BOTH lysine + reactive lysine) ---
+        aa_cf <- Protein_Correction %>%
+          dplyr::filter(`Protein Form` %in% c(
+            "histidine","leucine","isoleucine","valine",
+            "tryptophan","lysine","reactive lysine",
+            "methionine","threonine","phenylalanine"
+          )) %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          # DO NOT drop plain lysine when reactive is present — we need both
+          dplyr::select(
+            NI_ID, Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`, `Correction Factor  (%)`
           ) %>%
-          mutate(calculation = paste0(round(value, 2), "/", Amount)) %>%
-          mutate(value = value / Amount) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            value,
-            AA,
-            calculation,
-            `Food Composition Ref`
+          dplyr::distinct() %>%
+          # Average CF at the Food/Species/Protein Form/... level and carry NI_IDs
+          dplyr::group_by(
+            Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          # Re-expand NI_ID for joining by NI_ID later
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # --- Crude protein digestibility lookup (unchanged) ---
+        cp_cf <- Protein_Correction %>%
+          dplyr::filter(`Protein Form` == "crude protein") %>%
+          dplyr::mutate(Food = stringr::str_remove(Food, ", Average")) %>%
+          dplyr::select(
+            NI_ID, Food, Species, `Protein Form`, `Sample Location`,
+            Calculation, `Data Collection Source`, `Correction Factor  (%)`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`
+          ) %>%
+          dplyr::summarise(
+            `Correction Factor  (%)` = round(mean(`Correction Factor  (%)`, na.rm = TRUE), 2),
+            NI_ID = paste0(NI_ID, collapse = "; "),
+            .groups = "drop"
+          ) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = "; ") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(cf = as.numeric(`Correction Factor  (%)`) / 100)
+
+        # Map AA label -> Protein Form used in correction table
+        # (Do NOT map lysine => reactive lysine here; we handle that via 'variant' below)
+        map_pf <- function(aa) dplyr::case_when(
+          aa == "methionine+cysteine" ~ "methionine",
+          aa == "phenylalanine+tyrosine" ~ "phenylalanine",
+          TRUE ~ aa
+        )
+
+        # --- Per-AA rows with digestibility applied BEFORE min()
+        # Duplicate the rows across two variants so we compute BOTH versions:
+        #  - variant = "lysine = reactive"  -> use reactive lysine CF for AA == "lysine"
+        #  - variant = "lysine = plain"     -> use plain lysine CF for AA == "lysine"
+        DIAAS_rows <- EAA_composition %>%
+          dplyr::filter(NI_ID != "Not Available", NI_ID != "NA") %>%
+          tidyr::drop_na(Protein, NI_ID) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg_per_g = (value / Protein) * 1000) %>%
+          dplyr::left_join(
+            scoring_pattern %>%
+              dplyr::rename(AA = Analyte) %>%
+              dplyr::filter(`Pattern Name` == input$EAA_rec_DIAAS,
+                            Age == input$rec_age_DIAAS) %>%
+              dplyr::select(AA, Amount),
+            by = "AA"
+          ) %>%
+          # Cross with the two lysine variants
+          tidyr::crossing(variant = c("lysine = reactive", "lysine = plain")) %>%
+          dplyr::mutate(
+            `Protein Form Join` = dplyr::case_when(
+              AA == "lysine" & variant == "lysine = reactive" ~ "reactive lysine",
+              AA == "lysine" & variant == "lysine = plain"    ~ "lysine",
+              TRUE ~ map_pf(AA)
+            )
+          ) %>%
+          # Bring AA-specific digestibility with NI_ID re-expanded
+          dplyr::left_join(
+            aa_cf %>%
+              dplyr::select(
+                NI_ID, `Protein Form`, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ),
+            by = c("NI_ID", "Protein Form Join" = "Protein Form")
+          ) %>%
+          dplyr::mutate(dig = cf) %>%
+          # numeric DIAAS term per AA (ratio). NA if dig is missing.
+          dplyr::mutate(value = (aa_mg_per_g * dig) / Amount) %>%
+          # full numeric term string (showing which digestibility was used)
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg_per_g, format = "f", digits = 2),
+              formatC(dig,        format = "f", digits = 3),
+              Amount
+            )
+          ) %>%
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`, Protein,
+            AA, Amount, aa_mg_per_g, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Protein Form Join`, variant
           )
 
-        temp_2 <- DIAAS %>%
-          select(fdcId, NI_ID, `food description`, value, calculation) %>%
-          group_by(fdcId, NI_ID, `food description`) %>%
-          summarise(
+        # --- Build full calculation string for AA-specific (include fdcId + description + variant) ---
+        temp_2 <- DIAAS_rows %>%
+          dplyr::select(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            AA, value, calc_piece, dig, variant
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            variant
+          ) %>%
+          dplyr::summarise(
+            min_val = { vv <- value; if (all(is.na(vv))) NA_real_ else min(vv, na.rm = TRUE) },
             calculation = paste0(
               "min(",
-              str_c(calculation, collapse = ", "),
-              ", 1) x Correction Factor \n = ",
-              paste0(ifelse(min(
-                round(value, 2)
-              ) >= 1, 1, min(
-                round(value, 2)
-              ))),
-              " x Correction Factor"
-            )
-          ) %>%
-          ungroup()
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") = ",
+              formatC(min_val, format = "f", digits = 4)
+            ),
+            n_rows = dplyr::n_distinct(AA[!is.na(dig) & !is.na(value)]),
+            .groups = "drop"
+          )
 
-        DIAAS <- DIAAS %>%
-          select(!calculation) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            value,
-            AA,
-            `Food Composition Ref`
-          ) %>%
-          group_by(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            `Food Composition Ref`
-          ) %>%
-          mutate(DIAAS = min(value)) %>%
-          filter(value == DIAAS) %>%
-          ungroup() %>%
-          left_join(temp_2) %>%
-          select(
-            fdcId,
-            NI_ID,
-            `food identifier`,
-            `food description`,
-            Protein,
-            AA,
-            DIAAS,
-            calculation,
-            `Food Composition Ref`
-          ) %>%
-          rename("Limiting AA" = "AA") %>%
-          separate_longer_delim(NI_ID, delim = ";") %>%
-          mutate(NI_ID = str_trim(NI_ID)) %>%
-          left_join(
-            Protein_Correction %>%
-              select(
-                NI_ID,
-                Food,
-                `Correction Factor  (%)`,
-                Species,
-                `Protein Form`,
-                `Sample Location`,
-                Calculation,
-                `Data Collection Source`
-              ) %>%
-              filter(`Sample Location` == "ileal") %>%
-              mutate(Food = str_remove(Food, ", Average")) %>%
-              group_by(
-                Food,
-                Species,
-                `Protein Form`,
-                `Sample Location`,
-                Calculation,
-                `Data Collection Source`
-              ) %>%
-              summarise(
-                `Correction Factor  (%)` = round(sum(`Correction Factor  (%)`, na.rm = TRUE) /
-                                                   n(), 2),
-                NI_ID = paste0(NI_ID, collapse = "; ")
-              ) %>%
-              separate_longer_delim(NI_ID, delim = "; ") %>%
-              distinct()
-          ) %>%
-          replace_na(list("Data Collection Source" = "Not Available")) %>%
-          mutate(indicator = ifelse(
-            `Data Collection Source` == `Food Composition Ref`,
-            1,
-            ifelse(
-              str_detect(`Food Composition Ref`, "Standard Reference"),
-              2,
-              3
+        # --- Limiting AA and final table for AA-specific (two rows per item: one per variant) ---
+        DIAAS_aa <- DIAAS_rows %>%
+          dplyr::left_join(
+            temp_2,
+            by = c(
+              "fdcId","food identifier","food description","Species",
+              "Sample Location","Calculation","Data Collection Source",
+              "Food Composition Ref","variant"
             )
-          )) %>%
-          filter(!(
-            Calculation == "metabolic availability" &
-              !str_detect(`Food Composition Ref`, "Standard Reference")
-          )) %>%
-          group_by(`food identifier`) %>%
-          mutate(min_indicator = ifelse(
-            `Data Collection Source` == "Not Available",
-            2,
-            min(indicator, na.rm = TRUE)
-          )) %>%
-          ungroup() %>%
-          filter(indicator == min_indicator) %>%
-          select(!indicator) %>%
-          select(!min_indicator) %>%
-          mutate(Food = ifelse(is.na(Food), `food description`, Food)) %>%
-          group_by(
-            Food,
-            Species,
-            `Protein Form`,
-            `Sample Location`,
-            Calculation,
-            `Data Collection Source`
           ) %>%
-          mutate(NI_ID = paste0(NI_ID, collapse = "; ")) %>%
-          distinct() %>%
-          mutate(DIAAS = DIAAS * ifelse(!is.na(`Correction Factor  (%)`), (
-            as.numeric(`Correction Factor  (%)`) / 100
-          ), 1)) %>%
-          filter(
-            `Protein Form` == "crude protein" |
-              `Limiting AA` == `Protein Form` |
-              (
-                `Limiting AA` == "methionine+cysteine" &
-                  `Protein Form` == "methionine"
-              ) |
-              (
-                `Limiting AA` == "phenylalanine+tyrosine" &
-                  `Protein Form` == "phenylalanine"
-              ) | (
-                `Limiting AA` == "lysine" & `Protein Form` == "reactive lysine"
-              )
+          dplyr::mutate(DIAAS = min_val) %>%
+          dplyr::filter(value == min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(indicator = dplyr::if_else(
+            `Data Collection Source` == `Food Composition Ref`, 1L,
+            dplyr::if_else(stringr::str_detect(`Food Composition Ref`, "Standard Reference"), 2L, 3L)
+          )) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(min_indicator = ifelse(
+            `Data Collection Source` == "Not Available", 2L, min(indicator, na.rm = TRUE)
+          )) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator, !min_indicator) %>%
+          # Rebuild Food label and re-concatenate NI_IDs within the row grouping (per variant)
+          dplyr::mutate(Food = dplyr::coalesce(Food, `food description`)) %>%
+          dplyr::group_by(
+            Food, Species, `Protein Form Join`, `Sample Location`,
+            Calculation, `Data Collection Source`,
+            `Food Composition Ref`, fdcId, AA, variant
           ) %>%
-          mutate(DIAAS = round(DIAAS, 4)) %>%
-          mutate(calculation = paste0(calculation, " \n = ", DIAAS)) %>%
-          select(
+          dplyr::mutate(NI_ID = paste0(unique(NI_ID), collapse = "; ")) %>%
+          dplyr::ungroup() %>%
+          dplyr::distinct() %>%
+          dplyr::transmute(
             NI_ID,
             Food,
-            Species,
-            `Sample Location`,
-            `Protein Form`,
+            Species, `Sample Location`,
+            `Protein Form` = `Protein Form Join`,
             Calculation,
-            `Correction Factor  (%)`,
-            `Limiting AA`,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
             fdcId,
-            DIAAS,
+            # `Lysine Variant` = variant,   # <— tells you which lysine CF was used
+            DIAAS = round(DIAAS, 2),
             calculation,
             `Food Composition Ref`,
             `Data Collection Source`
           ) %>%
-          distinct() %>%
-          mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`)) %>%
-          replace_na(
-            list(
-              Calculation = "Not Available",
-              `Sample Location` = "Not Available",
-              `Protein Form` = "Not Available",
-              Species = "Not Available",
-              `Correction Factor  (%)` = "Not Available",
-              `Data Collection Source` = "Not Available"
+          dplyr::distinct() %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
+
+        # --- Crude protein branch (unchanged) ---
+        DIAAS_cp_rows <- EAA_composition %>%
+          tidyr::drop_na(Protein, NI_ID) %>%
+          tidyr::separate_longer_delim(NI_ID, delim = ";") %>%
+          dplyr::mutate(NI_ID = stringr::str_trim(NI_ID)) %>%
+          dplyr::mutate(aa_mg_per_g = (value / Protein) * 1000) %>%
+          dplyr::left_join(
+            scoring_pattern %>%
+              dplyr::rename(AA = Analyte) %>%
+              dplyr::filter(`Pattern Name` == input$EAA_rec_DIAAS,
+                            Age == input$rec_age_DIAAS) %>%
+              dplyr::select(AA, Amount),
+            by = "AA"
+          ) %>%
+          dplyr::left_join(
+            cp_cf %>%
+              dplyr::select(
+                NI_ID, cf,
+                Food, Species, `Sample Location`,
+                Calculation, `Data Collection Source`
+              ),
+            by = "NI_ID"
+          ) %>%
+          dplyr::filter(!is.na(cf)) %>%
+          dplyr::mutate(dig = cf) %>%
+          dplyr::mutate(value = (aa_mg_per_g * dig) / Amount) %>%
+          dplyr::mutate(
+            calc_piece = sprintf(
+              "(%s * %s) / %s",
+              formatC(aa_mg_per_g, format = "f", digits = 2),
+              formatC(dig, format = "f", digits = 3),
+              Amount
             )
           ) %>%
-          distinct()
+          dplyr::select(
+            fdcId, NI_ID, `food identifier`, `food description`, Protein,
+            AA, Amount, aa_mg_per_g, dig, value, calc_piece,
+            `Food Composition Ref`,
+            Food, Species, `Sample Location`,
+            Calculation, `Data Collection Source`
+          )
 
+        temp_3 <- DIAAS_cp_rows %>%
+          dplyr::select(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`,
+            AA, value, calc_piece, dig
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::group_by(
+            fdcId, `food identifier`, `food description`, Species,
+            `Sample Location`, Calculation,
+            `Data Collection Source`, `Food Composition Ref`
+          ) %>%
+          dplyr::summarise(
+            min_val = { vv <- value; if (all(is.na(vv))) NA_real_ else min(vv, na.rm = TRUE) },
+            calculation = paste0(
+              "min(",
+              stringr::str_c(calc_piece, collapse = ", "),
+              ") = ",
+              formatC(min_val, format = "f", digits = 4)
+            ),
+            .groups = "drop"
+          )
 
-        rm(temp_2)
+        DIAAS_cp <- DIAAS_cp_rows %>%
+          dplyr::left_join(
+            temp_3,
+            by = c(
+              "fdcId","food identifier","food description","Species",
+              "Sample Location","Calculation","Data Collection Source",
+              "Food Composition Ref"
+            )
+          ) %>%
+          dplyr::mutate(DIAAS = min_val) %>%
+          dplyr::filter(value == min_val) %>%
+          tidyr::replace_na(list(`Data Collection Source` = "Not Available")) %>%
+          dplyr::mutate(indicator = dplyr::if_else(
+            `Data Collection Source` == `Food Composition Ref`, 1L,
+            dplyr::if_else(stringr::str_detect(`Food Composition Ref`, "Standard Reference"), 2L, 3L)
+          )) %>%
+          dplyr::group_by(`food identifier`) %>%
+          dplyr::mutate(min_indicator = ifelse(
+            `Data Collection Source` == "Not Available", 2L, min(indicator, na.rm = TRUE)
+          )) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(indicator == min_indicator) %>%
+          dplyr::select(!indicator, !min_indicator) %>%
+          dplyr::transmute(
+            NI_ID,
+            Food = dplyr::coalesce(Food, `food description`),
+            Species, `Sample Location`,
+            `Protein Form` = "crude protein",
+            Calculation,
+            `Correction Factor  (%)` = dig * 100,
+            `Limiting AA` = AA,
+            fdcId,
+            # `Lysine Variant` = NA_character_,  # not applicable in CP branch
+            DIAAS = round(DIAAS, 2),
+            calculation,
+            `Food Composition Ref`,
+            `Data Collection Source`
+          ) %>%
+          dplyr::distinct() %>%
+          dplyr::mutate(`Correction Factor  (%)` = as.character(`Correction Factor  (%)`))
 
+        # --- Combine both approaches (AA-specific has two variants per item) ---
+        DIAAS <- dplyr::bind_rows(DIAAS_aa, DIAAS_cp)
+
+        # --- Output toggle ---
         if (input$show_calc == "score_only") {
-          DIAAS <- DIAAS %>%
-            select(!calculation)
-        } else{
-          DIAAS <- DIAAS %>%
-            select(!DIAAS) %>%
-            rename("DIAAS" = "calculation")
+          DIAAS <- DIAAS %>% dplyr::select(-calculation)
+        } else {
+          DIAAS <- DIAAS %>% dplyr::select(-DIAAS) %>% dplyr::rename("DIAAS" = "calculation")
         }
 
         if (length(input$score) != 1) {
-          PQ_df <- full_join(PQ_df, DIAAS)
-        } else{
+          PQ_df <- dplyr::full_join(PQ_df, DIAAS)
+        } else {
           PQ_df <- DIAAS
         }
-
-
       }
+
+
+
+
+
+
 
       if ("crude protein" %in% debounced_filters()$analyte) {
         if (!("individual amino acids" %in% debounced_filters()$analyte)) {
@@ -3203,7 +3850,10 @@ server <- function(input, output, session) {
         extensions = c('FixedHeader'),
         container = sketch,
         options = list(
-          fixedHeader = TRUE,
+          fixedHeader = list(
+            header = TRUE,
+            headerOffset = 0
+          ),
           dom = 'ltip',
           pageLength = 25,
           lengthMenu = c(15, 25, 50, 75, 100),
@@ -3213,7 +3863,7 @@ server <- function(input, output, session) {
             list(4, 'asc'),
             list(5, 'asc')
           ),
-          columnDefs = list(# list(targets = c(1, 2, 9), className = "dt-head-nowrap"),
+          columnDefs = list(
             list(
               targets = c('Correction Factor Ref', 'Food Composition Ref'),
               render = JS(
@@ -3222,7 +3872,11 @@ server <- function(input, output, session) {
                 "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
                 "}"
               )
-            ))
+            )
+          ),
+          # Add this to help with header rendering
+          autoWidth = FALSE,
+          scrollX = FALSE
         ),
         escape = FALSE  # Allow HTML rendering
       ) %>%
@@ -3313,7 +3967,7 @@ server <- function(input, output, session) {
 
     # Build the table
     DT::datatable(
-      fdcmp_df,
+      fdcmp_df %>% distinct(),
       container = sketch,
       extensions = c('Buttons', 'FixedHeader'),
       class = "display cell-border compact",
