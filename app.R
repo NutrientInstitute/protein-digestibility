@@ -860,6 +860,12 @@ nav_panel(
         ),
         tags$li(
           a(
+            href = "https://doi.org/10.1016/j.tjnut.2025.08.004",
+            "True Ileal Amino Acid Digestibility of Human Foods Classified According to Food Type as Determined in the Growing Pig (Hodgkinson et al. 2025)"
+          )
+        ),
+        tags$li(
+          a(
             href = "https://doi.org/10.17226/13298",
             "Nutrient Requirements of Swine: Eleventh Revised Edition (NRC 2012)",
             tags$b("**")
